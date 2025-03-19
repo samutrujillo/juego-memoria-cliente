@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import io from 'socket.io-client';
 import '@/styles/Login.css';
+import config from '@/config';
 
 // Socket.io se iniciará al cargar el componente
 let socket;
@@ -16,8 +17,8 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // Inicializar socket
-    socket = io('http://localhost:5000');
+    // Inicializar socket con la configuración centralizada
+    socket = io(config.socketServerUrl, config.socketOptions);
 
     socket.on('connect', () => {
       setIsConnected(true);
@@ -33,8 +34,23 @@ export default function Home() {
 
     socket.on('connect_error', (error) => {
       console.error('Error de conexión con el servidor:', error.message);
+      console.error('Detalles adicionales:', {
+        message: error.message,
+        description: error.description,
+        context: error.context
+      });
       setIsConnected(false);
       setError('Error de conexión con el servidor: ' + error.message);
+    });
+
+    socket.on('reconnect_attempt', (attemptNumber) => {
+      console.log(`Intento de reconexión #${attemptNumber}`);
+    });
+
+    socket.on('reconnect', (attemptNumber) => {
+      console.log(`Reconectado después de ${attemptNumber} intentos`);
+      setIsConnected(true);
+      setError('');
     });
 
     socket.on('disconnect', () => {
@@ -127,6 +143,24 @@ export default function Home() {
           <p>Admin: admin / admin123</p>
         </div>
       </div>
+      
+      <button 
+        onClick={() => {
+          console.log('Estado de la conexión:', socket.connected ? 'Conectado' : 'Desconectado');
+          socket.emit('test', { message: 'Prueba manual' });
+        }}
+        style={{
+          marginTop: '20px',
+          padding: '10px',
+          background: '#333',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer'
+        }}
+      >
+        Verificar Conexión
+      </button>
     </main>
   );
 }
