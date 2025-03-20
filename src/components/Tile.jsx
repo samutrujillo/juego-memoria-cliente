@@ -3,7 +3,7 @@
 import React from 'react';
 import '@/styles/Tile.css';
 
-const Tile = ({ index, revealed, value, onClick, disabled }) => {
+const Tile = ({ index, revealed, value, onClick, disabled, lastSelected }) => {
   // Determinar la fila basada en el índice
   const row = Math.floor(index / 4);
   
@@ -53,10 +53,23 @@ const Tile = ({ index, revealed, value, onClick, disabled }) => {
   // Determinar las clases de la ficha
   const tileClass = () => {
     const baseClass = `tile ${getColor()}`;
+    const classes = [];
+    
     if (revealed) {
-      return `${baseClass} revealed ${value > 0 ? 'winner' : 'loser'}`;
+      classes.push('revealed');
+      classes.push(value > 0 ? 'winner' : 'loser');
     }
-    return baseClass;
+    
+    if (disabled && !revealed) {
+      classes.push('disabled');
+    }
+    
+    // Añadir clase para la última ficha seleccionada
+    if (lastSelected) {
+      classes.push('last-selected');
+    }
+    
+    return `${baseClass} ${classes.join(' ')}`;
   };
 
   const handleClick = (e) => {

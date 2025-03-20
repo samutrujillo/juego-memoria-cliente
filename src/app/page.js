@@ -10,7 +10,6 @@ import config from '@/config';
 let socket;
 
 export default function Home() {
-  const [isConnected, setIsConnected] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -21,41 +20,12 @@ export default function Home() {
     socket = io(config.socketServerUrl, config.socketOptions);
 
     socket.on('connect', () => {
-      setIsConnected(true);
       console.log('Conectado al servidor con ID:', socket.id);
-      
-      // Enviar un evento de prueba para verificar la conexión
-      socket.emit('test', { message: 'Prueba de conexión desde login' });
-    });
-
-    socket.on('testResponse', (data) => {
-      console.log('Respuesta de prueba recibida:', data);
     });
 
     socket.on('connect_error', (error) => {
       console.error('Error de conexión con el servidor:', error.message);
-      console.error('Detalles adicionales:', {
-        message: error.message,
-        description: error.description,
-        context: error.context
-      });
-      setIsConnected(false);
-      setError('Error de conexión con el servidor: ' + error.message);
-    });
-
-    socket.on('reconnect_attempt', (attemptNumber) => {
-      console.log(`Intento de reconexión #${attemptNumber}`);
-    });
-
-    socket.on('reconnect', (attemptNumber) => {
-      console.log(`Reconectado después de ${attemptNumber} intentos`);
-      setIsConnected(true);
-      setError('');
-    });
-
-    socket.on('disconnect', () => {
-      setIsConnected(false);
-      console.log('Desconectado del servidor');
+      setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
     });
 
     // Limpiar al desmontar
@@ -81,7 +51,8 @@ export default function Home() {
           id: response.userId,
           username: response.username,
           score: response.score,
-          isBlocked: response.isBlocked
+          isBlocked: response.isBlocked,
+          isAdmin: response.isAdmin
         };
         
         // Guardar datos completos
@@ -99,19 +70,13 @@ export default function Home() {
           router.push('/game');
         }
       } else {
-        setError(response.message);
+        setError(response.message || 'Error de inicio de sesión');
       }
     });
   };
 
   return (
-    <main>
-      {isConnected ? (
-        <div className="connection-status connected">Conectado al servidor</div>
-      ) : (
-        <div className="connection-status disconnected">Desconectado del servidor</div>
-      )}
-
+    <main className="login-page">
       <div className="login-container">
         <h2>Iniciar Sesión</h2>
         {error && <div className="error-message">{error}</div>}
@@ -143,24 +108,6 @@ export default function Home() {
           <p>Admin: admin / admin123</p>
         </div>
       </div>
-      
-      <button 
-        onClick={() => {
-          console.log('Estado de la conexión:', socket.connected ? 'Conectado' : 'Desconectado');
-          socket.emit('test', { message: 'Prueba manual' });
-        }}
-        style={{
-          marginTop: '20px',
-          padding: '10px',
-          background: '#333',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer'
-        }}
-      >
-        Verificar Conexión
-      </button>
     </main>
   );
 }

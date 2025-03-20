@@ -6,7 +6,9 @@
   padding: 20px;
   max-width: 1200px;
   margin: 0 auto;
-  background-color: #2d1b48; /* Fondo morado oscuro como en tu imagen */
+  background-color: #2d1b48;
+  min-height: 100vh;
+  box-sizing: border-box;
 }
 
 .game-info {
@@ -14,17 +16,21 @@
   text-align: center;
   margin-bottom: 20px;
   color: white;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .game-board {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 5px;
-  max-width: 650px;
+  gap: 10px;
   width: 100%;
+  max-width: 650px;
   padding: 15px;
-  background-color: #3b2063; /* Fondo morado más claro */
+  background-color: #3b2063;
   border-radius: 12px;
+  box-sizing: border-box;
 }
 
 .message {
@@ -84,34 +90,33 @@
   animation: blink 1s infinite;
 }
 
-.rows-info {
-  margin: 10px 0;
-  font-size: 1rem;
-  color: white;
-  background-color: rgba(0, 0, 0, 0.2);
-  padding: 5px 10px;
-  border-radius: 4px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-}
-
-.rows-info span {
-  padding: 3px 8px;
-  border-radius: 4px;
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.row-limit-reached {
-  background-color: rgba(255, 50, 50, 0.3) !important;
-  font-weight: bold;
-}
-
 .game-score {
   font-size: 1.5rem;
   color: white;
   margin-bottom: 10px;
+}
+
+.rows-info {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 8px;
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.rows-info span {
+  padding: 3px 8px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.row-limit-reached {
+  color: #ff9800;
+  font-weight: bold;
 }
 
 .loading-message {
@@ -176,6 +181,42 @@
   border: 2px solid #c62828;
 }
 
+/* Estilos para notificaciones de turno */
+.turn-notification {
+  position: fixed;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(25, 118, 210, 0.9);
+  color: white;
+  padding: 15px 30px;
+  border-radius: 8px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  z-index: 1000;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  animation: fadeInOut 3s ease;
+}
+
+/* Estilos para indicadores de conexión */
+.connection-status {
+  padding: 8px;
+  margin: 10px 0;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.connected {
+  background-color: rgba(76, 175, 80, 0.2);
+  color: #4CAF50;
+}
+
+.disconnected {
+  background-color: rgba(244, 67, 54, 0.2);
+  color: #F44336;
+}
+
 @keyframes fadeInOut {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
   20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -200,17 +241,93 @@
   100% { opacity: 1; }
 }
 
-@media (max-width: 600px) {
-  .game-board {
-    gap: 3px;
+/* Responsive Media Queries */
+@media (max-width: 768px) {
+  .game-container {
     padding: 10px;
+    gap: 10px;
+  }
+  
+  .game-board {
+    padding: 10px;
+    gap: 8px;
   }
   
   .game-info h2 {
-    font-size: 1.3rem;
+    font-size: 1.4rem;
   }
   
-  .time-display {
+  .time-display, .current-player {
+    font-size: 1.2rem;
+  }
+  
+  .player-item {
+    padding: 8px;
+  }
+  
+  .rows-info {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .rows-info span {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .turn-notification {
     font-size: 1.3rem;
+    padding: 12px 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .game-container {
+    padding: 8px;
+    gap: 8px;
+  }
+  
+  .game-board {
+    padding: 8px;
+    gap: 6px;
+  }
+  
+  .game-info h2 {
+    font-size: 1.2rem;
+  }
+  
+  .time-display, .current-player {
+    font-size: 1.1rem;
+  }
+  
+  .points-alert {
+    font-size: 1.2rem;
+    padding: 12px 20px;
+  }
+  
+  .turn-notification {
+    font-size: 1.1rem;
+    padding: 10px 20px;
+  }
+}
+
+@media (max-width: 350px) {
+  .game-container {
+    padding: 5px;
+  }
+  
+  .game-board {
+    padding: 5px;
+    gap: 4px;
+  }
+  
+  .points-alert {
+    font-size: 1rem;
+    padding: 10px 15px;
+  }
+  
+  .turn-notification {
+    font-size: 0.9rem;
+    padding: 8px 16px;
   }
 }

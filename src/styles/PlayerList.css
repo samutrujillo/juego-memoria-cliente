@@ -4,6 +4,11 @@
   gap: 5px;
   max-height: 300px;
   overflow-y: auto;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 10px;
+  box-sizing: border-box;
 }
 
 .player-item {
@@ -13,6 +18,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 5px;
 }
 
 .player-item.active {
@@ -38,4 +44,20 @@
   padding: 10px;
   color: #aaa;
   font-style: italic;
+}
+
+@media (max-width: 480px) {
+  .player-list {
+    padding: 5px;
+  }
+  
+  .player-item {
+    padding: 6px 10px;
+    font-size: 0.9rem;
+  }
+  
+  .blocked-badge {
+    font-size: 0.7em;
+    padding: 1px 4px;
+  }
 }

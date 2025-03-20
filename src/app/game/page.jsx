@@ -5,10 +5,9 @@ import { useRouter } from 'next/navigation';
 import io from 'socket.io-client';
 import PlayerList from '@/components/PlayerList';
 import Tile from '@/components/Tile';
+import AdminButton from '@/components/AdminButton';
 import '@/styles/GameBoard.css';
-
-// URL del servidor basada en el entorno
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL;
+import config from '@/config';
 
 let socket;
 
@@ -46,22 +45,57 @@ export default function Game() {
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [players, setPlayers] = useState([]);
   const [isYourTurn, setIsYourTurn] = useState(false);
-  const [score, setScore] = useState(0);
-  const [localScore, setLocalScore] = useState(0); // Nuevo estado para manejo de puntaje local
+  const [score, setScore] = useState(60000);
+  const [localScore, setLocalScore] = useState(60000); // Puntaje local
   const [message, setMessage] = useState('');
   const [timeLeft, setTimeLeft] = useState(4);
-  const [gameStatus, setGameStatus] = useState('playing'); // Cambiado de 'waiting' a 'playing'
+  const [gameStatus, setGameStatus] = useState('playing');
   const [user, setUser] = useState(null);
   const [rowSelections, setRowSelections] = useState([0, 0, 0, 0]);
   const [canSelectTiles, setCanSelectTiles] = useState(true);
-  // Estados para las alertas
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastSelectedTile, setLastSelectedTile] = useState(null);
+  const [turnNotification, setTurnNotification] = useState('');
+  
+  // Estado para alertas
   const [showAlert, setShowAlert] = useState(false);
   const [alertType, setAlertType] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
+  
+  // Estado para modal de administrador
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  
   const router = useRouter();
   
-  // Referencia para el audio
-  const selectSoundRef = useRef(null);
+  // Referencias para los sonidos (ignoraremos los errores por ahora)
+  const winSoundRef = useRef(null);
+  const loseSoundRef = useRef(null);
+  const turnSoundRef = useRef(null);
+
+  // Función segura para reproducir sonidos (ignora errores)
+  const playSoundSafely = (audioRef, volume = 1.0) => {
+    if (audioRef && audioRef.current) {
+      audioRef.current.volume = volume;
+      audioRef.current.currentTime = 0;
+      
+      // Usar Promise.catch para manejar errores silenciosamente
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.log('Error reproduciendo sonido (ignorado):', error);
+          // No hacer nada en caso de error, permitiendo que el juego continúe
+        });
+      }
+    }
+  };
+
+  // Debug useEffect para el estado del usuario
+  useEffect(() => {
+    if (user) {
+      console.log("Renderizando Game.jsx con usuario:", user);
+      console.log("Nombre de usuario:", user?.username);
+    }
+  }, [user]);
 
   // Función para mostrar la alerta
   const showPointsAlert = (points) => {
@@ -70,10 +104,44 @@ export default function Game() {
     setAlertMessage(isPositive ? `¡Ganaste ${points} puntos!` : `¡Perdiste ${Math.abs(points)} puntos!`);
     setShowAlert(true);
     
+    // Reproducir el sonido correspondiente (usando la función segura)
+    if (isPositive) {
+      playSoundSafely(winSoundRef);
+    } else {
+      playSoundSafely(loseSoundRef);
+    }
+    
     // Ocultar la alerta después de 2 segundos sin detener el juego
     setTimeout(() => {
       setShowAlert(false);
     }, 2000);
+  };
+
+  // Función para mostrar notificaciones de acciones de otros jugadores
+  const showPlayerActionNotification = (username, value) => {
+    const isPositive = value > 0;
+    const message = isPositive 
+      ? `${username} ganó ${value} puntos` 
+      : `${username} perdió ${Math.abs(value)} puntos`;
+    
+    // Mostrar una notificación temporal
+    setMessage(message);
+    setTimeout(() => setMessage(''), 2000);
+  };
+
+  // Función para mostrar notificación de cambio de turno
+  const showTurnNotification = (player, isYourTurnNow) => {
+    if (isYourTurnNow) {
+      setTurnNotification('¡Es tu turno ahora!');
+      // Reproducir sonido de turno (usando la función segura)
+      playSoundSafely(turnSoundRef);
+    } else {
+      setTurnNotification(`Turno de ${player.username}`);
+    }
+    // Mostrar la notificación por 3 segundos
+    setTimeout(() => {
+      setTurnNotification('');
+    }, 3000);
   };
 
   // Función para reiniciar el tablero local
@@ -82,6 +150,41 @@ export default function Game() {
     const newBoard = generateLocalBoard();
     setBoard(newBoard);
     setRowSelections([0, 0, 0, 0]);
+  };
+
+  // Función mejorada para actualizar el puntaje local con persistencia
+  const updateLocalScore = (newScore) => {
+    setLocalScore(newScore);
+    
+    try {
+      const userData = sessionStorage.getItem('user');
+      if (userData) {
+        const userObj = JSON.parse(userData);
+        userObj.score = newScore;
+        sessionStorage.setItem('user', JSON.stringify(userObj));
+        console.log('Puntaje actualizado en sessionStorage:', newScore);
+        
+        // Verificar que se guardó correctamente
+        const checkData = sessionStorage.getItem('user');
+        if (checkData) {
+          const checkObj = JSON.parse(checkData);
+          if (checkObj.score !== newScore) {
+            console.warn('Verificación fallida: el puntaje no se guardó correctamente');
+          }
+        }
+      } else {
+        console.warn('No se encontraron datos de usuario en sessionStorage');
+      }
+    } catch (error) {
+      console.error('Error actualizando sessionStorage:', error);
+    }
+  };
+
+  // Función para abrir el modal de administrador
+  const handleAdminPanel = () => {
+    console.log("Abriendo panel de administración");
+    console.log("Estado del usuario:", user);
+    setShowAdminModal(true);
   };
 
   useEffect(() => {
@@ -96,15 +199,10 @@ export default function Game() {
     try {
       const parsedUser = JSON.parse(userData);
       console.log('Usuario recuperado de sessionStorage:', parsedUser);
-      console.log('Estado inicial del usuario:', { 
-        id: parsedUser.id, 
-        username: parsedUser.username,
-        score: parsedUser.score
-      });
       
       setUser(parsedUser);
-      setScore(parsedUser.score || 0);
-      setLocalScore(parsedUser.score || 0); // Inicializar el puntaje local
+      setScore(parsedUser.score || 60000);
+      setLocalScore(parsedUser.score || 60000); // Inicializar el puntaje local
 
       if (parsedUser.isBlocked) {
         setMessage('Tu cuenta está bloqueada. Contacta al administrador.');
@@ -114,17 +212,10 @@ export default function Game() {
       // Establecer un tablero local con distribución perfecta
       const initialBoard = generateLocalBoard();
       setBoard(initialBoard);
-      console.log("Tablero local generado:", initialBoard);
 
-      // Inicializar socket con opciones más permisivas
-      console.log('Iniciando conexión con Socket.io...');
-      socket = io(SOCKET_URL, {
-        transports: ['websocket', 'polling'],
-        reconnection: true,
-        reconnectionAttempts: Infinity,
-        reconnectionDelay: 1000,
-        timeout: 10000
-      });
+      // Inicializar socket con la configuración centralizada
+      console.log('Iniciando conexión con Socket.io a:', config.socketServerUrl);
+      socket = io(config.socketServerUrl, config.socketOptions);
 
       // Añadir manejo específico de errores
       socket.on('error', (error) => {
@@ -136,10 +227,8 @@ export default function Game() {
       });
 
       socket.on('connect', () => {
+        setIsConnected(true);
         console.log('Conectado al servidor Socket.io con ID:', socket.id);
-        
-        // Enviar un evento de prueba para verificar la conexión
-        socket.emit('test', { message: 'Prueba de conexión desde juego' });
         
         // Al conectarse, solicitar una sincronización de puntaje
         if (parsedUser && parsedUser.id) {
@@ -160,18 +249,33 @@ export default function Game() {
         }
       });
 
-      socket.on('testResponse', (data) => {
-        console.log('Respuesta de prueba recibida:', data);
-      });
-
-      // Evento específico para debuggear selección de fichas
-      socket.on('tileSelectResponse', (data) => {
-        console.log('Respuesta a selección de ficha:', data);
-      });
-
+      // Mejor manejo de errores de conexión
       socket.on('connect_error', (err) => {
         console.error('Error de conexión Socket.io:', err);
-        setMessage('Error de conexión con el servidor: ' + err.message);
+        setIsConnected(false);
+        setMessage('Error de conexión con el servidor. Reintentando...');
+        
+        // Reintentar conexión automáticamente
+        setTimeout(() => {
+          if (!socket.connected) {
+            console.log("Reintentando conexión...");
+            socket.connect();
+          }
+        }, 2000);
+      });
+
+      // Manejo de cierre de sesión
+      socket.on('sessionClosed', (message) => {
+        alert(message);
+        router.push('/');
+      });
+
+      socket.on('reconnect', (attemptNumber) => {
+        console.log(`Reconectado después de ${attemptNumber} intentos`);
+        setIsConnected(true);
+        
+        // Al reconectar, volver a unirse al juego
+        socket.emit('joinGame');
       });
 
       socket.on('gameState', (gameState) => {
@@ -193,48 +297,25 @@ export default function Game() {
           if (allRevealed) {
             needsNewBoard = true;
           }
-          
-          // Verificar distribución de valores por fila
-          const distribution = [0, 0, 0, 0];
-          for (let i = 0; i < gameState.board.length; i++) {
-            const rowIndex = Math.floor(i / 4);
-            if (gameState.board[i].value > 0) {
-              distribution[rowIndex]++;
-            }
-          }
-          
-          // Si alguna fila no tiene exactamente 2 fichas positivas, necesitamos un nuevo tablero
-          for (let i = 0; i < 4; i++) {
-            if (distribution[i] !== 2) {
-              needsNewBoard = true;
-              break;
-            }
-          }
         }
         
         if (needsNewBoard) {
           console.log("Generando nuevo tablero local...");
           // Generar un nuevo tablero con distribución perfecta
           const newBoard = generateLocalBoard();
-          setBoard(newBoard);
           
           // Copiar estados de revelación si existen
           if (gameState.board && gameState.board.length > 0) {
-            setBoard(prev => {
-              const updatedBoard = [...prev];
-              for (let i = 0; i < Math.min(updatedBoard.length, gameState.board.length); i++) {
-                if (gameState.board[i].revealed) {
-                  updatedBoard[i] = {
-                    ...updatedBoard[i],
-                    revealed: true
-                  };
-                }
+            for (let i = 0; i < Math.min(newBoard.length, gameState.board.length); i++) {
+              if (gameState.board[i].revealed) {
+                newBoard[i].revealed = true;
               }
-              return updatedBoard;
-            });
+            }
           }
+          
+          setBoard(newBoard);
         } else {
-          // Si la distribución ya es correcta, actualizar solo el estado de revelación
+          // Si no necesitamos un tablero nuevo, actualizar el estado de revelación
           setBoard(prev => {
             const updatedBoard = [...prev];
             for (let i = 0; i < Math.min(updatedBoard.length, gameState.board.length); i++) {
@@ -249,6 +330,11 @@ export default function Game() {
           });
         }
         
+        // Verificar si ha cambiado el jugador actual
+        const prevPlayerId = currentPlayer?.id;
+        const newPlayerId = gameState.currentPlayer?.id;
+        
+        // Actualizar el estado del juego
         setCurrentPlayer(gameState.currentPlayer);
         setPlayers(gameState.players || []);
         setGameStatus(gameState.status || 'playing'); // Usar 'playing' como valor predeterminado
@@ -256,6 +342,11 @@ export default function Game() {
         // Si solo hay un jugador, siempre es su turno mientras el juego esté en progreso
         const isCurrentUserTurn = (gameState.players && gameState.players.length <= 1) || 
           (gameState.currentPlayer && gameState.currentPlayer.id === parsedUser.id);
+        
+        // Mostrar notificación si cambió el jugador actual
+        if (prevPlayerId !== newPlayerId && gameState.currentPlayer) {
+          showTurnNotification(gameState.currentPlayer, isCurrentUserTurn);
+        }
         
         setIsYourTurn(isCurrentUserTurn);
         
@@ -277,23 +368,14 @@ export default function Game() {
         console.log(`Actualización directa de puntaje: ${newScore}`);
         // Este evento ahora actualiza ambos puntajes - local y remoto
         setScore(newScore);
-        setLocalScore(newScore);
+        updateLocalScore(newScore);
       });
 
       socket.on('forceScoreUpdate', (newScore) => {
         console.log(`FORZANDO actualización de puntaje a: ${newScore}`);
         // Actualizar ambos puntajes
         setScore(newScore);
-        setLocalScore(newScore);
-        
-        // También almacenar en sessionStorage para persistencia
-        const userData = sessionStorage.getItem('user');
-        if (userData) {
-          const parsedUser = JSON.parse(userData);
-          parsedUser.score = newScore;
-          sessionStorage.setItem('user', JSON.stringify(parsedUser));
-          console.log('Puntaje actualizado en sessionStorage:', parsedUser.score);
-        }
+        updateLocalScore(newScore);
       });
 
       socket.on('scoreUpdate', (data) => {
@@ -304,18 +386,18 @@ export default function Game() {
           if (data.userId === parsedUser.id) {
             console.log(`Actualizando mi puntaje a ${data.newScore}`);
             setScore(data.newScore);
-            setLocalScore(data.newScore);
+            updateLocalScore(data.newScore);
           }
         } else {
-          // Si es solo un número, actualizar directamente (compatibilidad hacia atrás)
+          // Si es solo un número, actualizar directamente
           console.log(`Actualizando mi puntaje a ${data}`);
           setScore(data);
-          setLocalScore(data);
+          updateLocalScore(data);
         }
       });
 
-      socket.on('tileSelected', ({ tileIndex, tileValue, playerId, newScore, rowSelections }) => {
-        console.log(`Recibido evento tileSelected: ficha ${tileIndex}, valor ${tileValue}, jugador ${playerId}, nuevo puntaje ${newScore}`);
+      socket.on('tileSelected', ({ tileIndex, tileValue, playerId, newScore, rowSelections, soundType, playerUsername, timestamp }) => {
+        console.log(`${playerUsername} seleccionó la ficha ${tileIndex}, valor ${tileValue}`);
         
         // Actualizar el tablero para todos los jugadores
         setBoard(prevBoard => {
@@ -324,20 +406,32 @@ export default function Game() {
             newBoard[tileIndex] = { 
               ...newBoard[tileIndex], 
               revealed: true, 
-              value: newBoard[tileIndex].value // Mantener el valor local
+              value: newBoard[tileIndex].value,
+              lastSelected: true // Marcar como última seleccionada para animación
             };
           }
           return newBoard;
         });
         
-        // Reproducir sonido y mostrar alerta si es mi ficha seleccionada
-        if (playerId === parsedUser.id) {
-          // Reproducir sonido
-          if (selectSoundRef.current) {
-            selectSoundRef.current.currentTime = 0;
-            selectSoundRef.current.play().catch(e => console.log('Error reproduciendo sonido:', e));
-          }
-          
+        // Guardar info para animación
+        setLastSelectedTile({
+          index: tileIndex,
+          playerId: playerId,
+          playerUsername: playerUsername,
+          timestamp: timestamp
+        });
+        
+        // Reproducir el sonido adecuado (usando la función segura)
+        const isCurrentPlayer = playerId === parsedUser.id;
+        
+        if (soundType === 'win') {
+          playSoundSafely(winSoundRef, isCurrentPlayer ? 1.0 : 0.3);
+        } else if (soundType === 'lose') {
+          playSoundSafely(loseSoundRef, isCurrentPlayer ? 1.0 : 0.3);
+        }
+        
+        // Si es mi ficha seleccionada, actualizar puntaje local
+        if (isCurrentPlayer) {
           // Usar el valor de nuestro tablero local
           const localTileValue = board[tileIndex]?.value || 0;
           
@@ -345,7 +439,10 @@ export default function Game() {
           showPointsAlert(localTileValue);
           
           console.log(`Actualizando mi puntaje local desde tileSelected a ${newScore}`);
-          setLocalScore(newScore);
+          updateLocalScore(newScore);
+        } else {
+          // Mostrar notificación de selección de otro jugador
+          showPlayerActionNotification(playerUsername, tileValue);
         }
         
         // Actualizar contador de selecciones por hilera
@@ -384,6 +481,12 @@ export default function Game() {
 
       socket.on('message', (newMessage) => {
         setMessage(newMessage);
+        setTimeout(() => setMessage(''), 2000);
+      });
+
+      socket.on('disconnect', () => {
+        setIsConnected(false);
+        console.log('Desconectado del servidor');
       });
 
       // Cleanup on unmount
@@ -400,7 +503,7 @@ export default function Game() {
           socket.off('directScoreUpdate');
           socket.off('blocked');
           socket.off('message');
-          socket.off('tileSelectResponse');
+          socket.off('sessionClosed');
           socket.emit('leaveGame');
           socket.disconnect();
           console.log('Socket desconectado');
@@ -497,22 +600,13 @@ export default function Game() {
     if (!board[index]?.revealed) {
       // Calcular nuevo puntaje localmente
       const newScore = localScore + tileValue;
-      setLocalScore(newScore);
+      updateLocalScore(newScore);
       
-      // Mostrar alerta de puntos ganados/perdidos
-      showPointsAlert(tileValue);
-      
-      // Guardar en sessionStorage
-      try {
-        const userData = sessionStorage.getItem('user');
-        if (userData) {
-          const user = JSON.parse(userData);
-          user.score = newScore;
-          sessionStorage.setItem('user', JSON.stringify(user));
-          console.log('Puntaje local actualizado en sessionStorage:', newScore);
-        }
-      } catch (error) {
-        console.error('Error actualizando sessionStorage:', error);
+      // Reproducir sonido según valor (usando la función segura)
+      if (tileValue > 0) {
+        playSoundSafely(winSoundRef);
+      } else {
+        playSoundSafely(loseSoundRef);
       }
       
       // Mostrar mensaje de puntos ganados/perdidos
@@ -528,7 +622,8 @@ export default function Game() {
         if (newBoard[index]) {
           newBoard[index] = { 
             ...newBoard[index], 
-            revealed: true
+            revealed: true,
+            lastSelected: true
           };
         }
         return newBoard;
@@ -547,104 +642,159 @@ export default function Game() {
     socket.emit('selectTile', { tileIndex: index });
   };
 
-  console.log('Renderizando con puntaje local:', localScore);
-
   if (!user) {
     return <div className="loading">Cargando...</div>;
   }
 
+  console.log("Renderizando Game.jsx con usuario:", user);
+  console.log("Nombre de usuario:", user?.username);
+
   return (
-    <div className="game-container">
-      {/* Audio para el sonido de selección de ficha */}
-      <audio ref={selectSoundRef} src="/sounds/tile-select.mp3" preload="auto"></audio>
-      
-      {/* Alerta para puntos ganados/perdidos */}
-      {showAlert && (
-        <div className={`points-alert ${alertType}`}>
-          {alertMessage}
+    <>
+      {/* Botón flotante para admin que siempre estará visible */}
+      {user?.username === "admin" && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            backgroundColor: '#ff4081',
+            color: 'white',
+            padding: '10px 20px',
+            borderRadius: '4px',
+            fontWeight: 'bold',
+            zIndex: 10000,
+            cursor: 'pointer',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.3)'
+          }}
+          onClick={handleAdminPanel}
+        >
+          Panel de Admin
         </div>
       )}
-      
-      <div className="game-info">
-        <h2>Jugador: {user?.username}</h2>
-
-        <div className="game-score">
-          Puntaje: {localScore}
-        </div>
-
-        {currentPlayer && (
-          <div className="current-player">
-            Jugador actual: {currentPlayer.username}
-            {isYourTurn && <span className="your-turn"> (¡Tu turno!)</span>}
+    
+      <div className="game-container">
+        {/* Sonidos para las fichas y notificaciones */}
+        <audio ref={winSoundRef} src="/sounds/win.mp3" preload="auto"></audio>
+        <audio ref={loseSoundRef} src="/sounds/lose.mp3" preload="auto"></audio>
+        <audio ref={turnSoundRef} src="/sounds/turn.mp3" preload="auto"></audio>
+        
+        {/* Notificación de cambio de turno */}
+        {turnNotification && (
+          <div className="turn-notification" style={{
+            position: 'fixed',
+            top: '40%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'rgba(25, 118, 210, 0.9)',
+            color: 'white',
+            padding: '15px 30px',
+            borderRadius: '8px',
+            fontSize: '1.5rem',
+            fontWeight: 'bold',
+            zIndex: 1000,
+            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
+            animation: 'fadeInOut 3s ease'
+          }}>
+            {turnNotification}
           </div>
         )}
-
-        <div className="time-display">
-          {isYourTurn ? (
-            <>Tiempo restante: <span className={`timer-value ${timeLeft === 0 ? 'time-up' : ''}`}>{timeLeft}</span> segundos</>
+        
+        {/* Alerta para puntos ganados/perdidos */}
+        {showAlert && (
+          <div className={`points-alert ${alertType}`}>
+            {alertMessage}
+          </div>
+        )}
+        
+        <div className="game-info">
+          <h2>Jugador: {user?.username}</h2>
+          
+          {isConnected ? (
+            <div className="connection-status connected">Conectado al servidor</div>
           ) : (
-            players.length <= 1 ? "¡Tu turno!" : "Esperando turno..."
+            <div className="connection-status disconnected">Desconectado del servidor</div>
+          )}
+          
+          <div className="game-score">
+            Puntaje: {localScore}
+          </div>
+
+          {currentPlayer && (
+            <div className="current-player">
+              Jugador actual: {currentPlayer.username}
+              {isYourTurn && <span className="your-turn"> (¡Tu turno!)</span>}
+            </div>
+          )}
+
+          <div className="time-display">
+            {isYourTurn ? (
+              <>Tiempo restante: <span className={`timer-value ${timeLeft === 0 ? 'time-up' : ''}`}>{timeLeft}</span> segundos</>
+            ) : (
+              players.length <= 1 ? "¡Tu turno!" : "Esperando turno..."
+            )}
+          </div>
+
+          <div className="rows-info">
+            Límites por hilera: 
+            {rowSelections.map((count, index) => (
+              <span key={index} className={count >= 2 ? 'row-limit-reached' : ''}>
+                Hilera {index + 1}: {count}/2
+              </span>
+            ))}
+          </div>
+
+          {message && <div className="message">{message}</div>}
+        </div>
+
+        <div className="game-board">
+          {Array.isArray(board) && board.length > 0 ? (
+            board.map((tile, index) => (
+              <Tile
+                key={index}
+                index={index}
+                revealed={tile?.revealed || false}
+                value={tile?.value || 0}
+                onClick={() => handleTileClick(index)}
+                disabled={
+                  tile?.revealed || 
+                  !canSelectTiles || 
+                  timeLeft <= 0 || 
+                  rowSelections[Math.floor(index / 4)] >= 2
+                }
+                lastSelected={lastSelectedTile?.index === index}
+              />
+            ))
+          ) : (
+            <div className="loading-message">
+              Cargando tablero...
+              <button
+                onClick={() => {
+                  if (socket) {
+                    socket.emit('joinGame');
+                  }
+                }}
+                className="retry-button"
+              >
+                Reintentar
+              </button>
+            </div>
           )}
         </div>
-        
-        <div className="rows-info">
-          Límites por hilera: 
-          {rowSelections.map((count, index) => (
-            <span key={index} className={count >= 2 ? 'row-limit-reached' : ''}>
-              Hilera {index + 1}: {count}/2
-            </span>
-          ))}
+
+        <div className="players-section">
+          <h3>Jugadores conectados</h3>
+          <PlayerList players={players} currentPlayerId={currentPlayer?.id} />
         </div>
-
-        {message && <div className="message">{message}</div>}
         
-        {/* Botón oculto para reiniciar el tablero (solo para depuración) */}
-        <button 
-          onClick={resetLocalBoard} 
-          style={{ display: 'none' }}
-        >
-          Reiniciar Tablero
-        </button>
-      </div>
-
-      <div className="game-board">
-        {Array.isArray(board) && board.length > 0 ? (
-          board.map((tile, index) => (
-            <Tile
-              key={index}
-              index={index}
-              revealed={tile?.revealed || false}
-              value={tile?.value || 0}
-              onClick={() => handleTileClick(index)}
-              disabled={
-                tile?.revealed || 
-                !canSelectTiles || 
-                timeLeft <= 0 || 
-                rowSelections[Math.floor(index / 4)] >= 2
-              }
-            />
-          ))
-        ) : (
-          <div className="loading-message">
-            Cargando tablero...
-            <button
-              onClick={() => {
-                if (socket) {
-                  socket.emit('joinGame');
-                }
-              }}
-              className="retry-button"
-            >
-              Reintentar
-            </button>
-          </div>
+        {/* Modal de administrador */}
+        {showAdminModal && (
+          <AdminButton 
+            onClose={() => setShowAdminModal(false)} 
+            socket={socket}
+          />
         )}
       </div>
-
-      <div className="players-section">
-        <h3>Jugadores conectados</h3>
-        <PlayerList players={players} currentPlayerId={currentPlayer?.id} />
-      </div>
-    </div>
+    </>
   );
 }
