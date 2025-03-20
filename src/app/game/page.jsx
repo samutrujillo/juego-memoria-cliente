@@ -67,7 +67,7 @@ export default function Game() {
   
   const router = useRouter();
   
-  // Referencias para los sonidos (ignoraremos los errores por ahora)
+  // Referencias para los sonidos
   const winSoundRef = useRef(null);
   const loseSoundRef = useRef(null);
   const turnSoundRef = useRef(null);
@@ -215,7 +215,13 @@ export default function Game() {
 
       // Inicializar socket con la configuración centralizada
       console.log('Iniciando conexión con Socket.io a:', config.socketServerUrl);
-      socket = io(config.socketServerUrl, config.socketOptions);
+      socket = io(config.socketServerUrl, {
+        ...config.socketOptions,
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000
+      });
 
       // Añadir manejo específico de errores
       socket.on('error', (error) => {
@@ -230,15 +236,17 @@ export default function Game() {
         setIsConnected(true);
         console.log('Conectado al servidor Socket.io con ID:', socket.id);
         
-        // Al conectarse, solicitar una sincronización de puntaje
-        if (parsedUser && parsedUser.id) {
-          socket.emit('syncScore', { userId: parsedUser.id });
-          console.log('Solicitando sincronización de puntaje para usuario:', parsedUser.id);
-        }
+        // Enviar evento para reconectar al usuario con su ID
+        socket.emit('reconnectUser', {
+          userId: parsedUser.id,
+          username: parsedUser.username
+        });
+        
+        // Al conectarse, solicitar una sincronización de puntaje y estado del juego
+        socket.emit('syncGameState', { userId: parsedUser.id });
         
         // Una vez conectado, unirse al juego
         socket.emit('joinGame');
-        console.log('Evento joinGame enviado');
         
         // Forzar el estado local a 'playing'
         setGameStatus('playing');
@@ -274,7 +282,8 @@ export default function Game() {
         console.log(`Reconectado después de ${attemptNumber} intentos`);
         setIsConnected(true);
         
-        // Al reconectar, volver a unirse al juego
+        // Al reconectar, sincronizar estado y volver a unirse al juego
+        socket.emit('syncGameState', { userId: parsedUser.id });
         socket.emit('joinGame');
       });
 
@@ -363,7 +372,17 @@ export default function Game() {
         }
       });
 
-      // Nuevo evento para actualización directa del puntaje
+      // Evento para reinicio de tablero
+      socket.on('boardReset', ({ message }) => {
+        // Mostrar mensaje de reinicio
+        setMessage(message);
+        setTimeout(() => setMessage(''), 3000);
+        
+        // Reiniciar contador de selecciones localmente
+        setRowSelections([0, 0, 0, 0]);
+      });
+
+      // Evento para actualizaciones directas de puntuación
       socket.on('directScoreUpdate', (newScore) => {
         console.log(`Actualización directa de puntaje: ${newScore}`);
         // Este evento ahora actualiza ambos puntajes - local y remoto
@@ -407,7 +426,8 @@ export default function Game() {
               ...newBoard[tileIndex], 
               revealed: true, 
               value: newBoard[tileIndex].value,
-              lastSelected: true // Marcar como última seleccionada para animación
+              lastSelected: true, // Marcar como última seleccionada para animación
+              selectedBy: playerUsername // Para mostrar quién la seleccionó
             };
           }
           return newBoard;
@@ -501,6 +521,7 @@ export default function Game() {
           socket.off('scoreUpdate');
           socket.off('forceScoreUpdate');
           socket.off('directScoreUpdate');
+          socket.off('boardReset');
           socket.off('blocked');
           socket.off('message');
           socket.off('sessionClosed');
@@ -549,6 +570,27 @@ export default function Game() {
       }
     };
   }, [isYourTurn]);
+
+  // Efecto para limpiar la marca de última ficha seleccionada
+  useEffect(() => {
+    if (lastSelectedTile) {
+      // Limpiar el estado de última seleccionada después de un tiempo
+      const timer = setTimeout(() => {
+        setBoard(prevBoard => {
+          const newBoard = [...prevBoard];
+          if (newBoard[lastSelectedTile.index] && newBoard[lastSelectedTile.index].lastSelected) {
+            newBoard[lastSelectedTile.index] = {
+              ...newBoard[lastSelectedTile.index],
+              lastSelected: false
+            };
+          }
+          return newBoard;
+        });
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [lastSelectedTile]);
 
   // Función modificada para manejar clics en fichas con puntaje local
   const handleTileClick = (index) => {
@@ -763,6 +805,7 @@ export default function Game() {
                   rowSelections[Math.floor(index / 4)] >= 2
                 }
                 lastSelected={lastSelectedTile?.index === index}
+                selectedBy={tile?.selectedBy}
               />
             ))
           ) : (
@@ -772,29 +815,29 @@ export default function Game() {
                 onClick={() => {
                   if (socket) {
                     socket.emit('joinGame');
-                  }
-                }}
-                className="retry-button"
-              >
-                Reintentar
-              </button>
-            </div>
-          )}
-        </div>
+                 }
+               }}
+               className="retry-button"
+             >
+               Reintentar
+             </button>
+           </div>
+         )}
+       </div>
 
-        <div className="players-section">
-          <h3>Jugadores conectados</h3>
-          <PlayerList players={players} currentPlayerId={currentPlayer?.id} />
-        </div>
-        
-        {/* Modal de administrador */}
-        {showAdminModal && (
-          <AdminButton 
-            onClose={() => setShowAdminModal(false)} 
-            socket={socket}
-          />
-        )}
-      </div>
-    </>
-  );
+       <div className="players-section">
+         <h3>Jugadores conectados</h3>
+         <PlayerList players={players} currentPlayerId={currentPlayer?.id} />
+       </div>
+       
+       {/* Modal de administrador */}
+       {showAdminModal && (
+         <AdminButton 
+           onClose={() => setShowAdminModal(false)} 
+           socket={socket}
+         />
+       )}
+     </div>
+   </>
+ );
 }

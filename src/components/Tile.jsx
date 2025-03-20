@@ -3,7 +3,7 @@
 import React from 'react';
 import '@/styles/Tile.css';
 
-const Tile = ({ index, revealed, value, onClick, disabled, lastSelected }) => {
+const Tile = ({ index, revealed, value, onClick, disabled, lastSelected, selectedBy }) => {
   // Determinar la fila basada en el índice
   const row = Math.floor(index / 4);
   
@@ -88,6 +88,11 @@ const Tile = ({ index, revealed, value, onClick, disabled, lastSelected }) => {
       data-row={row}
     >
       {displayValue()}
+      {selectedBy && revealed && (
+        <div className="selected-by-label">
+          {selectedBy}
+        </div>
+      )}
     </div>
   );
 };
