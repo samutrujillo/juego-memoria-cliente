@@ -20,12 +20,12 @@ export default function Game() {
     for (let row = 0; row < 4; row++) {
       const rowTiles = [];
       
-      // Crear 2 fichas ganadoras y 2 perdedoras para esta hilera
+      // Crear 2 fichas ganadoras (+15000) y 2 perdedoras (-15000) para esta hilera
       for (let i = 0; i < 2; i++) {
-        rowTiles.push({ value: 15000, revealed: false });
+        rowTiles.push({ value: 15000, revealed: false });  // Asegurarse que es positivo
       }
       for (let i = 0; i < 2; i++) {
-        rowTiles.push({ value: -15000, revealed: false });
+        rowTiles.push({ value: -15000, revealed: false }); // Asegurarse que es negativo
       }
       
       // Mezclarlas
@@ -37,6 +37,9 @@ export default function Game() {
       // Añadirlas al tablero
       localBoard.push(...rowTiles);
     }
+    
+    // Validación adicional para verificar los valores
+    console.log('Tablero local generado:', localBoard.map(tile => tile.value));
     
     return localBoard;
   };
@@ -248,6 +251,26 @@ export default function Game() {
         socket.emit('joinGame');
       });
 
+      // Nuevo evento para manejar cambios en la conexión de jugadores
+      socket.on('playerConnectionChanged', ({ playerId, isConnected, username }) => {
+        // Actualizar la lista de jugadores localmente
+        setPlayers(prevPlayers => 
+          prevPlayers.map(player => 
+            player.id === playerId 
+              ? { ...player, isConnected } 
+              : player
+          )
+        );
+        
+        // Mostrar mensaje informativo
+        const message = isConnected 
+          ? `${username} se ha reconectado al juego` 
+          : `${username} se ha desconectado del juego`;
+        
+        setMessage(message);
+        setTimeout(() => setMessage(''), 3000);
+      });
+
       // Recibir actualización del estado de las mesas
       socket.on('tablesUpdate', ({ tablesPlayed, currentTable, maxReached, lockReason }) => {
         if (tablesPlayed !== undefined) {
@@ -396,7 +419,8 @@ export default function Game() {
             newBoard[tileIndex] = { 
               ...newBoard[tileIndex], 
               revealed: true, 
-              value: newBoard[tileIndex].value,
+              // Usar el valor que viene del servidor, no el local
+              value: tileValue,
               lastSelected: true,
               selectedBy: playerUsername
             };
@@ -413,14 +437,16 @@ export default function Game() {
         
         const isCurrentPlayer = playerId === parsedUser.id;
         
-        if (soundType === 'win') {
+        // Determinar el tipo de sonido basado en el valor real
+        const isPositiveValue = tileValue > 0;
+        if (isPositiveValue) {
           playSoundSafely(winSoundRef, isCurrentPlayer ? 1.0 : 0.3);
-        } else if (soundType === 'lose') {
+        } else {
           playSoundSafely(loseSoundRef, isCurrentPlayer ? 1.0 : 0.3);
         }
         
         if (isCurrentPlayer) {
-          // Usar el valor que viene del servidor directamente
+          // Usar el valor que viene del servidor
           showPointsAlert(tileValue);
           updateLocalScore(newScore);
         } else {
@@ -493,6 +519,7 @@ export default function Game() {
           socket.off('message');
           socket.off('sessionClosed');
           socket.off('tablesUpdate');
+          socket.off('playerConnectionChanged');
           socket.emit('leaveGame');
           socket.disconnect();
         }
@@ -596,7 +623,15 @@ export default function Game() {
       const newScore = localScore + tileValue;
       updateLocalScore(newScore);
       
-      // Mostrar alerta de puntos ganados/perdidos con el valor correcto
+      // Determinar el tipo de sonido basado en el valor real
+      const isPositiveValue = tileValue > 0;
+      if (isPositiveValue) {
+        playSoundSafely(winSoundRef);
+      } else {
+        playSoundSafely(loseSoundRef);
+      }
+      
+      // Mostrar alerta con el valor correcto
       showPointsAlert(tileValue);
       
       setBoard(prevBoard => {

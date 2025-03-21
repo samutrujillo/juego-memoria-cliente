@@ -39,6 +39,21 @@
   font-size: 0.8em;
 }
 
+.player-item.disconnected {
+  opacity: 0.6;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+}
+
+.disconnected-badge {
+  background-color: #ff9800;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.8em;
+  margin-left: 5px;
+}
+
 .no-players {
   text-align: center;
   padding: 10px;
@@ -56,7 +71,7 @@
     font-size: 0.9rem;
   }
   
-  .blocked-badge {
+  .blocked-badge, .disconnected-badge {
     font-size: 0.7em;
     padding: 1px 4px;
   }

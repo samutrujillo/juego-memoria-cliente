@@ -4,7 +4,6 @@ import React from 'react';
 import '@/styles/PlayerList.css';
 
 const PlayerList = ({ players, currentPlayerId }) => {
-  // Si players no está definido o no es un array, devolvemos un componente vacío
   if (!players || !Array.isArray(players)) {
     return <div className="player-list">No hay jugadores conectados</div>;
   }
@@ -17,10 +16,14 @@ const PlayerList = ({ players, currentPlayerId }) => {
         players.map((player) => (
           <div 
             key={player.id} 
-            className={`player-item ${player.id === currentPlayerId ? 'active' : ''} ${player.isBlocked ? 'blocked' : ''}`}
+            className={`player-item 
+              ${player.id === currentPlayerId ? 'active' : ''} 
+              ${player.isBlocked ? 'blocked' : ''} 
+              ${player.isConnected === false ? 'disconnected' : ''}`}
           >
             <span>{player.username}</span>
             {player.isBlocked && <span className="blocked-badge">Bloqueado</span>}
+            {player.isConnected === false && <span className="disconnected-badge">Desconectado</span>}
           </div>
         ))
       )}
