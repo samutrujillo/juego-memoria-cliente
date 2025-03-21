@@ -96,29 +96,6 @@
   margin-bottom: 10px;
 }
 
-.rows-info {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-  margin: 10px 0;
-  padding: 8px;
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 4px;
-}
-
-.rows-info span {
-  padding: 3px 8px;
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  font-size: 0.9rem;
-}
-
-.row-limit-reached {
-  color: #ff9800;
-  font-weight: bold;
-}
-
 .loading-message {
   grid-column: span 4;
   text-align: center;
@@ -217,6 +194,48 @@
   color: #F44336;
 }
 
+/* Información de mesas */
+.tables-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  margin: 10px 0;
+  font-size: 1rem;
+}
+
+.table-limit-warning {
+  color: #ff9800;
+  font-weight: bold;
+  margin-top: 5px;
+  font-size: 0.9rem;
+}
+
+/* Header con botón de cerrar sesión */
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.logout-button {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.logout-button:hover {
+  background-color: #d32f2f;
+}
+
 @keyframes fadeInOut {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
   20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -263,16 +282,6 @@
   
   .player-item {
     padding: 8px;
-  }
-  
-  .rows-info {
-    flex-direction: column;
-    align-items: center;
-  }
-  
-  .rows-info span {
-    width: 100%;
-    text-align: center;
   }
   
   .turn-notification {

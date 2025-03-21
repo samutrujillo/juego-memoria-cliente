@@ -95,6 +95,19 @@ const AdminModal = ({ onClose, socket }) => {
     });
   };
 
+  const unlockTables = (playerId) => {
+    setStatus('Desbloqueando mesas para el jugador...');
+    socket.emit('unlockTables', { userId: playerId }, (response) => {
+      if (response.success) {
+        setStatus(`Mesas desbloqueadas para ${players.find(p => p.id === playerId)?.username}`);
+        setTimeout(() => setStatus(''), 2000);
+      } else {
+        setStatus('Error al desbloquear mesas');
+        setTimeout(() => setStatus(''), 2000);
+      }
+    });
+  };
+
   const resetGame = () => {
     if (window.confirm('¿Estás seguro de que quieres reiniciar el juego?')) {
       setStatus('Reiniciando juego...');
@@ -168,6 +181,12 @@ const AdminModal = ({ onClose, socket }) => {
                     >
                       {player.isBlocked ? 'Desbloquear' : 'Bloquear'}
                     </button>
+                    <button 
+                      onClick={() => unlockTables(player.id)}
+                      className="unlock-tables-btn"
+                    >
+                      Desbloquear Mesas
+                    </button>
                   </div>
                 </div>
               ))
@@ -186,26 +205,8 @@ const AdminModal = ({ onClose, socket }) => {
 };
 
 // Componente principal AdminButton
-const AdminButton = ({ socket }) => {
-  const [showModal, setShowModal] = useState(false);
-
-  return (
-    <div className="admin-panel">
-      <button 
-        className="admin-button"
-        onClick={() => setShowModal(true)}
-      >
-        Panel de Admin
-      </button>
-
-      {showModal && (
-        <AdminModal
-          onClose={() => setShowModal(false)}
-          socket={socket}
-        />
-      )}
-    </div>
-  );
+const AdminButton = ({ onClose, socket }) => {
+  return <AdminModal onClose={onClose} socket={socket} />;
 };
 
 export default AdminButton;

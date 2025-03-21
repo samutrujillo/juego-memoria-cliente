@@ -164,7 +164,8 @@
 
 .add-points-btn,
 .remove-points-btn,
-.toggle-block-btn {
+.toggle-block-btn,
+.unlock-tables-btn {
   padding: 8px 12px;
   border-radius: 4px;
   border: none;
@@ -193,6 +194,14 @@
 
 .toggle-block-btn.unblock {
   background-color: #2196f3;
+}
+
+.unlock-tables-btn {
+  background-color: #9c27b0;
+}
+
+.unlock-tables-btn:hover {
+  background-color: #7b1fa2;
 }
 
 .admin-actions {
@@ -260,7 +269,8 @@
     padding: 6px;
   }
   
-  .toggle-block-btn {
+  .toggle-block-btn,
+  .unlock-tables-btn {
     font-size: 0.8rem;
     padding: 6px;
   }
