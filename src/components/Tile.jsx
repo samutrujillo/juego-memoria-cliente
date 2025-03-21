@@ -72,8 +72,15 @@ const Tile = ({ index, revealed, value, onClick, disabled, lastSelected, selecte
     return `${baseClass} ${classes.join(' ')}`;
   };
 
-  const handleClick = (e) => {
-    e.preventDefault();
+  // Modificar el handleClick para manejar tanto clics como toques
+  const handleInteraction = (e) => {
+    e.preventDefault(); // Prevenir comportamiento por defecto
+    
+    // Evitar doble disparo de eventos en dispositivos táctiles
+    if (e.type === 'touchend') {
+      e.stopPropagation();
+    }
+    
     if (!disabled) {
       onClick();
     }
@@ -82,7 +89,8 @@ const Tile = ({ index, revealed, value, onClick, disabled, lastSelected, selecte
   return (
     <div 
       className={tileClass()} 
-      onClick={handleClick}
+      onClick={handleInteraction}
+      onTouchEnd={handleInteraction}
       style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
       data-value={value}
       data-row={row}

@@ -237,10 +237,10 @@
 }
 
 @keyframes fadeInOut {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-  20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+  15% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  85% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
 }
 
 @keyframes pulse {
@@ -297,8 +297,8 @@
   }
   
   .game-board {
-    padding: 8px;
-    gap: 6px;
+    gap: 4px;
+    padding: 6px;
   }
   
   .game-info h2 {
@@ -311,12 +311,45 @@
   
   .points-alert {
     font-size: 1.2rem;
-    padding: 12px 20px;
+    padding: 10px 15px;
+    width: 80%;
+    max-width: 300px;
   }
   
   .turn-notification {
     font-size: 1.1rem;
-    padding: 10px 20px;
+    padding: 8px 16px;
+    width: 80%;
+    max-width: 300px;
+  }
+  
+  /* Aumentar el área para tocar los botones */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Optimizar la interfaz de información del juego */
+  .game-info {
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+  
+  .game-header h2 {
+    font-size: 1.2rem;
+  }
+  
+  .game-score, .current-player, .time-display {
+    font-size: 1rem;
+  }
+  
+  .tables-info {
+    font-size: 0.9rem;
+  }
+  
+  .message {
+    padding: 8px;
+    font-size: 0.9rem;
   }
 }
 
@@ -328,6 +361,21 @@
   .game-board {
     padding: 5px;
     gap: 4px;
+  }
+  
+  .game-board {
+    gap: 2px;
+    padding: 4px;
+  }
+  
+  .tile {
+    font-size: 1rem;
+    margin: 1px;
+  }
+  
+  .connection-status, .tables-info, .message {
+    font-size: 0.8rem;
+    padding: 5px;
   }
   
   .points-alert {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import io from 'socket.io-client';
 import PlayerList from '@/components/PlayerList';
@@ -80,6 +80,9 @@ export default function Game() {
   const winSoundRef = useRef(null);
   const loseSoundRef = useRef(null);
   const turnSoundRef = useRef(null);
+  
+  // Referencia para seguimiento de cambios en puntuación
+  const prevScoreRef = useRef();
 
   // Función segura para reproducir sonidos (ignora errores)
   const playSoundSafely = (audioRef, volume = 1.0) => {
@@ -147,9 +150,11 @@ export default function Game() {
     } else {
       setTurnNotification(`Turno de ${player.username}`);
     }
+    
+    // Reducido a 1.5 segundos como solicitado
     setTimeout(() => {
       setTurnNotification('');
-    }, 3000);
+    }, 1500);
   };
 
   // Función para actualizar el puntaje local con persistencia
@@ -187,6 +192,9 @@ export default function Game() {
       setUser(parsedUser);
       setScore(parsedUser.score || 60000);
       setLocalScore(parsedUser.score || 60000);
+      
+      // Inicializar referencia de puntuación
+      prevScoreRef.current = parsedUser.score || 60000;
 
       if (parsedUser.isBlocked) {
         setMessage('Tu cuenta está bloqueada. Contacta al administrador.');
@@ -197,13 +205,16 @@ export default function Game() {
       const initialBoard = generateLocalBoard();
       setBoard(initialBoard);
 
-      // Inicializar socket
+      // Inicializar socket con opciones mejoradas para compatibilidad móvil
       socket = io(config.socketServerUrl, {
         ...config.socketOptions,
         reconnection: true,
         reconnectionAttempts: 10,
         reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000
+        reconnectionDelayMax: 5000,
+        timeout: 20000, // Aumentar timeout para conexiones móviles lentas
+        forceNew: false,
+        transports: ['websocket', 'polling'] // Asegurar compatibilidad con todos los dispositivos
       });
 
       socket.on('connect', () => {
@@ -237,6 +248,15 @@ export default function Game() {
             socket.connect();
           }
         }, 2000);
+      });
+
+      // Manejo específico para reconexiones en dispositivos móviles
+      socket.on('reconnect_attempt', (attemptNumber) => {
+        console.log(`Intento de reconexión #${attemptNumber}`);
+        // Si estamos en un dispositivo móvil, cambiar a polling que funciona mejor con conexiones inestables
+        if (window.innerWidth <= 768 && attemptNumber > 2) {
+          socket.io.opts.transports = ['polling', 'websocket'];
+        }
       });
 
       socket.on('sessionClosed', (message) => {
@@ -506,6 +526,7 @@ export default function Game() {
         if (socket) {
           socket.off('connect');
           socket.off('connect_error');
+          socket.off('reconnect_attempt');
           socket.off('gameState');
           socket.off('tileSelected');
           socket.off('turnTimeout');
@@ -579,8 +600,25 @@ export default function Game() {
     }
   }, [lastSelectedTile]);
 
+  // Efecto para verificar cambios sospechosos en la puntuación
+  useEffect(() => {
+    // Verificar cambios grandes en la puntuación (más de 15000 puntos)
+    if (prevScoreRef.current && Math.abs(localScore - prevScoreRef.current) > 15000) {
+      console.warn(`Cambio sospechoso en puntuación: ${prevScoreRef.current} -> ${localScore}`);
+      
+      // Solicitar sincronización de puntuación con el servidor
+      if (socket && socket.connected && user?.id) {
+        console.log('Solicitando sincronización de puntaje debido a cambio sospechoso');
+        socket.emit('syncScore', { userId: user.id });
+      }
+    }
+    
+    // Actualizar la referencia para la próxima comparación
+    prevScoreRef.current = localScore;
+  }, [localScore, socket, user]);
+
   // Función para manejar clics en fichas
-  const handleTileClick = (index) => {
+  const handleTileClick = useCallback((index) => {
     // No permitir seleccionar fichas si se alcanzó el límite de mesas
     if (maxTablesReached) {
       setMessage(`Límite de mesas alcanzado. ${tableLockReason}`);
@@ -620,8 +658,25 @@ export default function Game() {
     
     const tileValue = board[index]?.value || 0;
     if (!board[index]?.revealed) {
-      const newScore = localScore + tileValue;
-      updateLocalScore(newScore);
+      // IMPORTANTE: Usar setState con callback para asegurar que se base en el valor actual
+      setLocalScore(prevScore => {
+        const newScore = prevScore + tileValue;
+        
+        // Guardar en sessionStorage de manera segura
+        try {
+          const userData = sessionStorage.getItem('user');
+          if (userData) {
+            const userObj = JSON.parse(userData);
+            userObj.score = newScore;
+            sessionStorage.setItem('user', JSON.stringify(userObj));
+            console.log('Puntaje local actualizado en sessionStorage:', newScore);
+          }
+        } catch (error) {
+          console.error('Error actualizando sessionStorage:', error);
+        }
+        
+        return newScore;
+      });
       
       // Determinar el tipo de sonido basado en el valor real
       const isPositiveValue = tileValue > 0;
@@ -653,8 +708,50 @@ export default function Game() {
       });
     }
     
-    socket.emit('selectTile', { tileIndex: index });
-  };
+    // Emisión al servidor con información completa
+    socket.emit('selectTile', { 
+      tileIndex: index,
+      currentScore: localScore // Enviar el puntaje actual para verificación
+    });
+  }, [board, canSelectTiles, isYourTurn, timeLeft, rowSelections, localScore, maxTablesReached, tableLockReason, socket, showPointsAlert]);
+
+  // Memoizar el tablero para evitar re-renderizados innecesarios
+  const memoizedBoard = useMemo(() => (
+    Array.isArray(board) && board.length > 0 ? (
+      board.map((tile, index) => (
+        <Tile
+          key={index}
+          index={index}
+          revealed={tile?.revealed || false}
+          value={tile?.value || 0}
+          onClick={() => handleTileClick(index)}
+          disabled={
+            tile?.revealed || 
+            !canSelectTiles || 
+            timeLeft <= 0 || 
+            rowSelections[Math.floor(index / 4)] >= 2 ||
+            maxTablesReached
+          }
+          lastSelected={lastSelectedTile?.index === index}
+          selectedBy={tile?.selectedBy}
+        />
+      ))
+    ) : (
+      <div className="loading-message">
+        Cargando tablero...
+        <button
+          onClick={() => {
+            if (socket) {
+              socket.emit('joinGame');
+            }
+          }}
+          className="retry-button"
+        >
+          Reintentar
+        </button>
+      </div>
+    )
+  ), [board, canSelectTiles, timeLeft, rowSelections, lastSelectedTile, maxTablesReached, handleTileClick]);
 
   if (!user) {
     return <div className="loading">Cargando...</div>;
@@ -745,40 +842,7 @@ export default function Game() {
         </div>
 
         <div className="game-board">
-          {Array.isArray(board) && board.length > 0 ? (
-            board.map((tile, index) => (
-              <Tile
-                key={index}
-                index={index}
-                revealed={tile?.revealed || false}
-                value={tile?.value || 0}
-                onClick={() => handleTileClick(index)}
-                disabled={
-                  tile?.revealed || 
-                  !canSelectTiles || 
-                  timeLeft <= 0 || 
-                  rowSelections[Math.floor(index / 4)] >= 2 ||
-                  maxTablesReached
-                }
-                lastSelected={lastSelectedTile?.index === index}
-                selectedBy={tile?.selectedBy}
-              />
-            ))
-          ) : (
-            <div className="loading-message">
-              Cargando tablero...
-              <button
-                onClick={() => {
-                  if (socket) {
-                    socket.emit('joinGame');
-                  }
-                }}
-                className="retry-button"
-              >
-                Reintentar
-              </button>
-            </div>
-          )}
+          {memoizedBoard}
         </div>
 
         <div className="players-section">
