@@ -52,7 +52,7 @@ export default function Home() {
           username: response.username,
           score: response.score,
           isBlocked: response.isBlocked,
-          isAdmin: response.isAdmin
+          isAdmin: response.isAdmin  // Asegurarse de que esta línea esté presente
         };
         
         // Guardar datos completos
@@ -65,7 +65,7 @@ export default function Home() {
         
         // Redirigir según el rol
         if (response.isAdmin) {
-          router.push('/admin');
+          router.push('/game'); // Cambiado de /admin a /game para usar el mismo panel
         } else {
           router.push('/game');
         }

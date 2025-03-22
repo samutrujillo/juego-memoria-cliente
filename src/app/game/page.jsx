@@ -179,6 +179,17 @@ export default function Game() {
     setShowAdminModal(true);
   };
 
+  // Efecto adicional para verificar y registrar el estado del usuario administrador
+  useEffect(() => {
+    if (user) {
+      console.log("Estado de usuario:", {
+        username: user.username,
+        isAdmin: user.isAdmin,
+        id: user.id
+      });
+    }
+  }, [user]);
+
   useEffect(() => {
     // Recuperar datos de usuario de sessionStorage
     const userData = sessionStorage.getItem('user');
@@ -759,8 +770,8 @@ export default function Game() {
 
   return (
     <>
-      {user?.username === "admin" && (
-        <div 
+      {(user?.isAdmin || user?.username?.toLowerCase() === "admin") && (
+        <button 
           style={{
             position: 'fixed',
             top: '20px',
@@ -772,12 +783,14 @@ export default function Game() {
             fontWeight: 'bold',
             zIndex: 10000,
             cursor: 'pointer',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.3)'
+            boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+            border: 'none',
+            fontSize: '14px'
           }}
           onClick={handleAdminPanel}
         >
           Panel de Admin
-        </div>
+        </button>
       )}
     
       <div className="game-container">
