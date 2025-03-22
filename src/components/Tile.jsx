@@ -46,7 +46,7 @@ const Tile = ({ index, revealed, value, onClick, disabled, lastSelected, selecte
     // Usar imagen de flecha según si es ganadora o perdedora
     return (
       <img 
-        src="/images/flechas.jpeg" 
+        src="/images/logo.png" 
         alt={value > 0 ? "+15K" : "-15K"} 
         className={`arrow-icon ${value > 0 ? 'up' : 'down'}`}
       />

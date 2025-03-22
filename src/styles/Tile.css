@@ -78,9 +78,10 @@
   transform: scale(0.95);
 }
 
+/* Actualización del tamaño de la flecha al 60% de la ficha */
 .arrow-icon {
-  width: 40px;
-  height: 40px;
+  width: 80%;
+  height: 80%;
   object-fit: contain;
   transform-origin: center;
 }
@@ -109,6 +110,12 @@
   .selected-by-label {
     font-size: 0.6rem;
   }
+  
+  /* Mantener proporción relativa en pantallas medianas */
+  .arrow-icon {
+    width: 80%;
+    height: 80%;
+  }
 }
 
 @media (max-width: 480px) {
@@ -129,9 +136,10 @@
     padding: 1px 0;
   }
   
+  /* Mantener proporción relativa en pantallas pequeñas */
   .arrow-icon {
-    width: 30px;
-    height: 30px;
+    width: 80%;
+    height: 80%;
   }
 }
  
@@ -142,8 +150,9 @@
     border-radius: 6px;
   }
   
+  /* Mantener proporción relativa en pantallas muy pequeñas */
   .arrow-icon {
-    width: 24px;
-    height: 24px;
+    width: 80%;
+    height: 80%;
   }
 }
