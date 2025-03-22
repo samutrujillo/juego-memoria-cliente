@@ -11,7 +11,7 @@ export default function RootLayout({ children }) {
       <body>
         <div className="app-container">
           <div className="app-title">
-            <img src="/images/logo.jpeg" alt="FTAPP GAME" className="logo-image" />
+            <img src="/images/logo.png" alt="FTAPP GAME" className="logo-image" />
           </div>
           {children}
         </div>
