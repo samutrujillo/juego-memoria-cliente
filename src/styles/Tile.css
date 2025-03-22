@@ -78,6 +78,21 @@
   transform: scale(0.95);
 }
 
+.arrow-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  transform-origin: center;
+}
+
+.arrow-icon.up {
+  transform: rotate(0deg);
+}
+
+.arrow-icon.down {
+  transform: rotate(180deg);
+}
+
 @keyframes pulse-highlight {
   0% { box-shadow: 0 0 0 rgba(255, 255, 255, 0); }
   50% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.7); }
@@ -113,12 +128,22 @@
     font-size: 0.6rem;
     padding: 1px 0;
   }
- }
+  
+  .arrow-icon {
+    width: 30px;
+    height: 30px;
+  }
+}
  
 @media (max-width: 350px) {
   .tile {
     font-size: 1.2rem;
     margin: 2px;
     border-radius: 6px;
+  }
+  
+  .arrow-icon {
+    width: 24px;
+    height: 24px;
   }
 }

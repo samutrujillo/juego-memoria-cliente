@@ -10,7 +10,9 @@ export default function RootLayout({ children }) {
     <html lang="es">
       <body>
         <div className="app-container">
-          <h1 className="app-title">FTAPP GAME</h1>
+          <div className="app-title">
+            <img src="/images/logo.jpeg" alt="FTAPP GAME" className="logo-image" />
+          </div>
           {children}
         </div>
       </body>

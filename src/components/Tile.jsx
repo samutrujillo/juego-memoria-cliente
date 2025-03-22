@@ -43,11 +43,14 @@ const Tile = ({ index, revealed, value, onClick, disabled, lastSelected, selecte
       return getIcon();
     }
     
-    if (value > 0) {
-      return `+${value/1000}K`;
-    }
-    
-    return `${value/1000}K`;
+    // Usar imagen de flecha según si es ganadora o perdedora
+    return (
+      <img 
+        src="/images/flechas.jpeg" 
+        alt={value > 0 ? "+15K" : "-15K"} 
+        className={`arrow-icon ${value > 0 ? 'up' : 'down'}`}
+      />
+    );
   };
   
   // Determinar las clases de la ficha

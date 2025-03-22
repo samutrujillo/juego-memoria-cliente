@@ -102,11 +102,7 @@ export default function Home() {
           <button type="submit" className="login-button">Entrar</button>
         </form>
         
-        <div className="credentials-info">
-          <p>Usuarios: jugador1 al jugador10</p>
-          <p>Contraseñas: clave1 al clave10</p>
-          <p>Admin: admin / admin123</p>
-        </div>
+        
       </div>
     </main>
   );
