@@ -69,8 +69,8 @@ export default function Game() {
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [players, setPlayers] = useState([]);
   const [isYourTurn, setIsYourTurn] = useState(false);
-  const [score, setScore] = useState(6000);
-  const [localScore, setLocalScore] = useState(6000);
+  const [score, setScore] = useState(60000);
+  const [localScore, setLocalScore] = useState(60000);
   const [message, setMessage] = useState('');
   const [timeLeft, setTimeLeft] = useState(4);
   const [gameStatus, setGameStatus] = useState('playing');
@@ -230,12 +230,12 @@ export default function Game() {
     try {
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
-      setScore(parsedUser.score || 6000);
-      setLocalScore(parsedUser.score || 6000);
+      setScore(parsedUser.score || 60000);
+      setLocalScore(parsedUser.score || 60000);
       setIsScoreLocked(parsedUser.isLockedDueToScore || false);
       
       // Inicializar referencia de puntuación
-      prevScoreRef.current = parsedUser.score || 6000;
+      prevScoreRef.current = parsedUser.score || 60000;
 
       // Establecer un tablero local
       const initialBoard = generateLocalBoard();
@@ -558,8 +558,9 @@ export default function Game() {
             setIsYourTurn(true);
           }
           
-          setMessage('¡Tu tiempo se agotó!');
-          setTimeout(() => setMessage(''), 2000);
+          // Eliminamos esta línea para que no aparezca el mensaje de tiempo agotado
+          // setMessage('¡Tu tiempo se agotó!');
+          // setTimeout(() => setMessage(''), 2000);
         }
       });
 
@@ -581,8 +582,11 @@ export default function Game() {
       });
 
       socket.on('message', (newMessage) => {
-        setMessage(newMessage);
-        setTimeout(() => setMessage(''), 3000);
+        // Filtrar mensajes relacionados con tiempo agotado
+        if (!newMessage.includes('tiempo se agotó')) {
+          setMessage(newMessage);
+          setTimeout(() => setMessage(''), 3000);
+        }
       });
 
       socket.on('disconnect', () => {
@@ -851,22 +855,6 @@ export default function Game() {
     return <div className="loading">Cargando...</div>;
   }
 
-  // Estilo para la notificación de turno (verde)
-  const turnNotificationStyle = {
-    position: 'fixed',
-    top: '40%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    backgroundColor: 'rgba(39, 174, 96, 0.9)', // Color verde
-    color: 'white',
-    padding: '15px 30px',
-    borderRadius: '8px',
-    fontWeight: 'bold',
-    zIndex: 1000,
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
-    animation: 'fadeInOut 3s ease'
-  };
-
   return (
     <>
       {/* Componente para ocultar el logo programáticamente */}
@@ -900,12 +888,6 @@ export default function Game() {
       <audio ref={loseSoundRef} src="/sounds/lose.mp3" preload="auto"></audio>
       <audio ref={turnSoundRef} src="/sounds/turn.mp3" preload="auto"></audio>
       
-      {turnNotification && (
-        <div style={turnNotificationStyle}>
-          {turnNotification}
-        </div>
-      )}
-      
       {showAlert && (
         <div className={`points-alert ${alertType}`}>
           {alertMessage}
@@ -925,59 +907,71 @@ export default function Game() {
         ) : (
           <div className="connection-status disconnected">Desconectado del servidor</div>
         )}
-        
-        {/* Nueva barra de información reorganizada */}
-        <div className="game-status-bar">
-          <div className="table-info">
-            Mesa {currentTableNumber} de 10
-          </div>
-          <div className="game-score">
-            Puntaje: {localScore}
-          </div>
-          <div className={`turn-status ${isYourTurn ? 'your-turn-indicator' : 'wait-turn-indicator'}`}>
-            {isYourTurn ? "Tu turno" : "Espere su turno"}
-          </div>
-        </div>
-
-        {/* Mensajes de bloqueo */}
-        {isScoreLocked && (
-          <div className="score-lock-banner">
-            Tu cuenta está bloqueada por alcanzar 23000 puntos. Contacta al administrador.
-          </div>
-        )}
-
-        {user?.isBlocked && (
-          <div className="score-lock-banner">
-            Tu cuenta está bloqueada por el administrador. Puedes ver el juego pero no jugar.
-          </div>
-        )}
-
-        {user?.isAdmin && (
-          <div className="admin-info-banner">
-            Modo administrador: Solo puedes observar el juego.
-          </div>
-        )}
-
-        {/* Información del jugador actual en blanco */}
-        {currentPlayer && (
-          <div className="current-player">
-            Jugador actual: <span className="current-player-name">{currentPlayer.username}</span>
-          </div>
-        )}
-
-        {/* Contador de tiempo visible siempre */}
-        <div className="time-display">
-          Tiempo: <span className={`timer-value ${timeLeft === 0 ? 'time-up' : ''}`}>{timeLeft}</span> segundos
-        </div>
-        
-        {message && <div className="message">{message}</div>}
       </div>
 
-      {/* El tablero siempre se muestra, independientemente del estado de bloqueo */}
+      {/* Mesa y turno en la parte superior, más grandes (60% más grandes) */}
+      <div className="game-status-bar">
+        <div className="table-info">
+          Mesa {currentTableNumber}
+        </div>
+        <div className={`turn-status ${isYourTurn ? 'your-turn-indicator' : 'wait-turn-indicator'}`}>
+          {isYourTurn ? "Tu turno" : "Espere su turno"}
+        </div>
+      </div>
+
+      {/* Puntaje después de mesa y turno */}
+      <div className="game-score">
+        Puntaje: {localScore}
+      </div>
+
+      {/* Mensajes de bloqueo */}
+      {isScoreLocked && (
+        <div className="score-lock-banner">
+          Tu cuenta está bloqueada por alcanzar 23000 puntos. Contacta al administrador.
+        </div>
+      )}
+
+      {user?.isBlocked && (
+        <div className="score-lock-banner">
+          Tu cuenta está bloqueada por el administrador. Puedes ver el juego pero no jugar.
+        </div>
+      )}
+
+      {user?.isAdmin && (
+        <div className="admin-info-banner">
+          Modo administrador: Solo puedes observar el juego.
+        </div>
+      )}
+
+      {message && <div className="message">{message}</div>}
+
+      {/* Tablero de juego más grande */}
       <div className="game-board">
         {memoizedBoard}
       </div>
 
+      {/* Área unificada para notificaciones debajo del tablero */}
+      <div className="notifications-area">
+        {turnNotification && (
+          <div className="turn-notification">
+            {turnNotification}
+          </div>
+        )}
+      </div>
+
+      {/* Jugador actual después de las notificaciones */}
+      {currentPlayer && (
+        <div className="current-player">
+          Jugador actual: <span className="current-player-name">{currentPlayer.username}</span>
+        </div>
+      )}
+
+      {/* Contador de tiempo */}
+      <div className="time-display">
+        Tiempo: <span className={`timer-value ${timeLeft === 0 ? 'time-up' : ''}`}>{timeLeft}</span> segundos
+      </div>
+      
+      {/* Lista de jugadores conectados */}
       <div className="players-section">
         <h3>Jugadores conectados</h3>
         <PlayerList players={players} currentPlayerId={currentPlayer?.id} />
@@ -991,5 +985,5 @@ export default function Game() {
       )}
     </div>
   </>
-);
+  );
 }
