@@ -1,5 +1,3 @@
-// AdminButton.jsx
-
 import { useState } from 'react';
 import '@/styles/AdminButton.css';
 
@@ -146,6 +144,21 @@ const AdminModal = ({ onClose, socket }) => {
     }
   };
 
+  const resetAllTables = () => {
+    if (window.confirm('¿Estás seguro de que quieres reiniciar los contadores de mesas para todos los jugadores?')) {
+      setStatus('Reiniciando contadores de mesas...');
+      socket.emit('adminResetTables', (response) => {
+        if (response.success) {
+          setStatus('Contadores de mesas reiniciados correctamente');
+          setTimeout(() => setStatus(''), 2000);
+        } else {
+          setStatus('Error al reiniciar los contadores de mesas');
+          setTimeout(() => setStatus(''), 2000);
+        }
+      });
+    }
+  };
+
   return (
     <div className="admin-modal-overlay">
       <div className="admin-modal">
@@ -232,6 +245,9 @@ const AdminModal = ({ onClose, socket }) => {
           <div className="admin-actions">
             <button onClick={resetGame} className="reset-game-btn">
               Reiniciar Juego
+            </button>
+            <button onClick={resetAllTables} className="reset-tables-btn">
+              Reiniciar Contadores de Mesas
             </button>
           </div>
         </div>

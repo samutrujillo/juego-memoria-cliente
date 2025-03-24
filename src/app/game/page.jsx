@@ -11,6 +11,27 @@ import config from '@/config';
 
 let socket;
 
+// Componente para ocultar el logo programáticamente
+const HideLogoEffect = () => {
+  useEffect(() => {
+    // Ocultar el logo al montar el componente
+    const logoElement = document.querySelector('.app-title');
+    if (logoElement) {
+      logoElement.style.display = 'none';
+    }
+    
+    // Restaurar visibilidad al desmontar (si es necesario)
+    return () => {
+      const logoElement = document.querySelector('.app-title');
+      if (logoElement) {
+        logoElement.style.display = 'block';
+      }
+    };
+  }, []);
+  
+  return null;
+};
+
 export default function Game() {
   // Función para generar un tablero local con distribución perfecta
   const generateLocalBoard = () => {
@@ -291,7 +312,7 @@ export default function Game() {
         setIsScoreLocked(true);
         setMessage(message);
         setTimeout(() => {
-          setMessage('Tu cuenta está bloqueada por alcanzar 23000 puntos');
+          setMessage('Tu cuenta está bloqueada por alcanzar o llegar a 23000 puntos');
         }, 5000);
       });
       
@@ -299,6 +320,47 @@ export default function Game() {
         setIsScoreLocked(false);
         setMessage(message);
         setTimeout(() => setMessage(''), 3000);
+      });
+
+      // Nuevo evento para cambios de estado de bloqueo en tiempo real
+      socket.on('blockStatusChanged', ({ isBlocked, isLockedDueToScore, message }) => {
+        if (isBlocked !== undefined) {
+          setUser(prev => ({ ...prev, isBlocked }));
+          
+          // Actualizar los datos del usuario en sessionStorage
+          try {
+            const userData = sessionStorage.getItem('user');
+            if (userData) {
+              const userObj = JSON.parse(userData);
+              userObj.isBlocked = isBlocked;
+              sessionStorage.setItem('user', JSON.stringify(userObj));
+            }
+          } catch (error) {
+            console.error('Error actualizando sessionStorage:', error);
+          }
+        }
+        
+        if (isLockedDueToScore !== undefined) {
+          setIsScoreLocked(isLockedDueToScore);
+          setUser(prev => ({ ...prev, isLockedDueToScore }));
+          
+          // Actualizar los datos del usuario en sessionStorage
+          try {
+            const userData = sessionStorage.getItem('user');
+            if (userData) {
+              const userObj = JSON.parse(userData);
+              userObj.isLockedDueToScore = isLockedDueToScore;
+              sessionStorage.setItem('user', JSON.stringify(userObj));
+            }
+          } catch (error) {
+            console.error('Error actualizando sessionStorage:', error);
+          }
+        }
+        
+        if (message) {
+          setMessage(message);
+          setTimeout(() => setMessage(''), 3000);
+        }
       });
 
       // Nuevo evento para manejar cambios en la conexión de jugadores
@@ -501,9 +563,9 @@ export default function Game() {
         }
       });
 
-      socket.on('tableLimitReached', ({ message, unlockTime }) => {
+      socket.on('tableLimitReached', ({ message }) => {
         setMaxTablesReached(true);
-        setTableLockReason(`${message} Se desbloqueará a las 6:00 AM`);
+        setTableLockReason(message);
       });
 
       socket.on('tablesUnlocked', () => {
@@ -513,18 +575,14 @@ export default function Game() {
         setTimeout(() => setMessage(''), 3000);
       });
 
-      // Modificado: El evento blocked ahora solo muestra un mensaje pero no redirecciona
+      // Modificado: El evento blocked ya no redirecciona
       socket.on('blocked', () => {
         setMessage('Tu cuenta ha sido bloqueada por el administrador. Puedes ver el juego pero no jugar.');
-        // Eliminar la redirección
-        // setTimeout(() => {
-        //   router.push('/');
-        // }, 3000);
       });
 
       socket.on('message', (newMessage) => {
         setMessage(newMessage);
-        setTimeout(() => setMessage(''), 2000);
+        setTimeout(() => setMessage(''), 3000);
       });
 
       socket.on('disconnect', () => {
@@ -552,6 +610,7 @@ export default function Game() {
           socket.off('playerConnectionChanged');
           socket.off('scoreLimitReached');
           socket.off('userUnlocked');
+          socket.off('blockStatusChanged');
           socket.emit('leaveGame');
           socket.disconnect();
         }
@@ -630,6 +689,13 @@ export default function Game() {
 
   // Función para manejar clics en fichas
   const handleTileClick = useCallback((index) => {
+    // No permitir seleccionar fichas si es administrador
+    if (user?.isAdmin) {
+      setMessage("Los administradores solo pueden observar el juego");
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+    
     // No permitir seleccionar fichas si está bloqueado por puntaje
     if (isScoreLocked) {
       setMessage("Tu cuenta está bloqueada por alcanzar 23000 puntos. Contacta al administrador.");
@@ -757,7 +823,8 @@ export default function Game() {
             rowSelections[Math.floor(index / 4)] >= 2 ||
             maxTablesReached ||
             isScoreLocked ||
-            user?.isBlocked // Añadir verificación del estado de bloqueo
+            user?.isBlocked ||
+            user?.isAdmin
           }
           lastSelected={lastSelectedTile?.index === index}
           selectedBy={tile?.selectedBy}
@@ -784,122 +851,145 @@ export default function Game() {
     return <div className="loading">Cargando...</div>;
   }
 
+  // Estilo para la notificación de turno (verde)
+  const turnNotificationStyle = {
+    position: 'fixed',
+    top: '40%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    backgroundColor: 'rgba(39, 174, 96, 0.9)', // Color verde
+    color: 'white',
+    padding: '15px 30px',
+    borderRadius: '8px',
+    fontWeight: 'bold',
+    zIndex: 1000,
+    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
+    animation: 'fadeInOut 3s ease'
+  };
+
   return (
     <>
+      {/* Componente para ocultar el logo programáticamente */}
+      <HideLogoEffect />
+      
       {(user?.isAdmin || user?.username?.toLowerCase() === "admin") && (
         <button 
-          style={{
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            backgroundColor: '#ff4081',
-            color: 'white',
-            padding: '10px 20px',
-            borderRadius: '4px',
-            fontWeight: 'bold',
-            zIndex: 10000,
-            cursor: 'pointer',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
-            border: 'none',
-            fontSize: '14px'
-          }}
-          onClick={handleAdminPanel}
-        >
-          Panel de Admin
-        </button>
+        style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          backgroundColor: '#ff4081',
+          color: 'white',
+          padding: '10px 20px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          zIndex: 10000,
+          cursor: 'pointer',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+          border: 'none',
+          fontSize: '14px'
+        }}
+        onClick={handleAdminPanel}
+      >
+        Panel de Admin
+      </button>
+    )}
+  
+    <div className="game-container game-page">
+      <audio ref={winSoundRef} src="/sounds/win.mp3" preload="auto"></audio>
+      <audio ref={loseSoundRef} src="/sounds/lose.mp3" preload="auto"></audio>
+      <audio ref={turnSoundRef} src="/sounds/turn.mp3" preload="auto"></audio>
+      
+      {turnNotification && (
+        <div style={turnNotificationStyle}>
+          {turnNotification}
+        </div>
       )}
-    
-      <div className="game-container">
-        <audio ref={winSoundRef} src="/sounds/win.mp3" preload="auto"></audio>
-        <audio ref={loseSoundRef} src="/sounds/lose.mp3" preload="auto"></audio>
-        <audio ref={turnSoundRef} src="/sounds/turn.mp3" preload="auto"></audio>
+      
+      {showAlert && (
+        <div className={`points-alert ${alertType}`}>
+          {alertMessage}
+        </div>
+      )}
+      
+      <div className="game-info">
+        <div className="game-header">
+          <h2>Jugador: {user?.username}</h2>
+          <button className="logout-button" onClick={handleLogout}>
+            Cerrar Sesión
+          </button>
+        </div>
         
-        {turnNotification && (
-          <div className="turn-notification">
-            {turnNotification}
-          </div>
+        {isConnected ? (
+          <div className="connection-status connected">Conectado al servidor</div>
+        ) : (
+          <div className="connection-status disconnected">Desconectado del servidor</div>
         )}
         
-        {showAlert && (
-          <div className={`points-alert ${alertType}`}>
-            {alertMessage}
+        {/* Nueva barra de información reorganizada */}
+        <div className="game-status-bar">
+          <div className="table-info">
+            Mesa {currentTableNumber} de 10
           </div>
-        )}
-        
-        <div className="game-info">
-          <div className="game-header">
-            <h2>Jugador: {user?.username}</h2>
-            <button className="logout-button" onClick={handleLogout}>
-              Cerrar Sesión
-            </button>
-          </div>
-          
-          {isConnected ? (
-            <div className="connection-status connected">Conectado al servidor</div>
-          ) : (
-            <div className="connection-status disconnected">Desconectado del servidor</div>
-          )}
-          
           <div className="game-score">
             Puntaje: {localScore}
           </div>
-
-          {/* Mostrar mensaje de bloqueo por puntaje */}
-          {isScoreLocked && (
-            <div className="score-lock-banner">
-              Tu cuenta está bloqueada por alcanzar 23000 puntos. Contacta al administrador.
-            </div>
-          )}
-
-          {/* Mostrar mensaje de bloqueo por administrador */}
-          {user?.isBlocked && (
-            <div className="score-lock-banner">
-              Tu cuenta está bloqueada por el administrador. Puedes ver el juego pero no jugar.
-            </div>
-          )}
-
-          {currentPlayer && (
-            <div className="current-player">
-              Jugador actual: {currentPlayer.username}
-              {isYourTurn && <span className="your-turn"> (¡Tu turno!)</span>}
-            </div>
-          )}
-
-          <div className="time-display">
-            {isYourTurn ? (
-              <>Tiempo restante: <span className={`timer-value ${timeLeft === 0 ? 'time-up' : ''}`}>{timeLeft}</span> segundos</>
-            ) : (
-              players.length <= 1 ? "¡Tu turno!" : "Esperando turno..."
-            )}
+          <div className={`turn-status ${isYourTurn ? 'your-turn-indicator' : 'wait-turn-indicator'}`}>
+            {isYourTurn ? "Tu turno" : "Espere su turno"}
           </div>
-          
-          <div className="tables-info">
-            Mesa actual: {currentTableNumber} de 10
-            {maxTablesReached && (
-              <div className="table-limit-warning">{tableLockReason}</div>
-            )}
-          </div>
-
-          {message && <div className="message">{message}</div>}
         </div>
 
-        {/* El tablero siempre se muestra, independientemente del estado de bloqueo */}
-        <div className="game-board">
-          {memoizedBoard}
-        </div>
+        {/* Mensajes de bloqueo */}
+        {isScoreLocked && (
+          <div className="score-lock-banner">
+            Tu cuenta está bloqueada por alcanzar 23000 puntos. Contacta al administrador.
+          </div>
+        )}
 
-        <div className="players-section">
-          <h3>Jugadores conectados</h3>
-          <PlayerList players={players} currentPlayerId={currentPlayer?.id} />
+        {user?.isBlocked && (
+          <div className="score-lock-banner">
+            Tu cuenta está bloqueada por el administrador. Puedes ver el juego pero no jugar.
+          </div>
+        )}
+
+        {user?.isAdmin && (
+          <div className="admin-info-banner">
+            Modo administrador: Solo puedes observar el juego.
+          </div>
+        )}
+
+        {/* Información del jugador actual en blanco */}
+        {currentPlayer && (
+          <div className="current-player">
+            Jugador actual: <span className="current-player-name">{currentPlayer.username}</span>
+          </div>
+        )}
+
+        {/* Contador de tiempo visible siempre */}
+        <div className="time-display">
+          Tiempo: <span className={`timer-value ${timeLeft === 0 ? 'time-up' : ''}`}>{timeLeft}</span> segundos
         </div>
         
-        {showAdminModal && (
-          <AdminButton 
-            onClose={() => setShowAdminModal(false)} 
-            socket={socket}
-          />
-        )}
+        {message && <div className="message">{message}</div>}
       </div>
-    </>
-  );
+
+      {/* El tablero siempre se muestra, independientemente del estado de bloqueo */}
+      <div className="game-board">
+        {memoizedBoard}
+      </div>
+
+      <div className="players-section">
+        <h3>Jugadores conectados</h3>
+        <PlayerList players={players} currentPlayerId={currentPlayer?.id} />
+      </div>
+      
+      {showAdminModal && (
+        <AdminButton 
+          onClose={() => setShowAdminModal(false)} 
+          socket={socket}
+        />
+      )}
+    </div>
+  </>
+);
 }

@@ -1,8 +1,8 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Juego de Memoria Multijugador',
-  description: 'Juego multijugador en tiempo real con Next.js y Socket.io',
+  title: 'FTAP GAME',
+  description: 'Juego multijugador en tiempo real ',
 };
 
 export default function RootLayout({ children }) {
