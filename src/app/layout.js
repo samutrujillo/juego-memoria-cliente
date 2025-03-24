@@ -1,7 +1,7 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'FTAP GAME',
+  title: 'FTAPP GAME',
   description: 'Juego multijugador en tiempo real ',
 };
 
