@@ -101,8 +101,6 @@ export default function Home() {
           </div>
           <button type="submit" className="login-button">Entrar</button>
         </form>
-        
-        
       </div>
     </main>
   );

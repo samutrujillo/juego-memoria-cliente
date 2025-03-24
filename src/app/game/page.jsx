@@ -48,8 +48,8 @@ export default function Game() {
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [players, setPlayers] = useState([]);
   const [isYourTurn, setIsYourTurn] = useState(false);
-  const [score, setScore] = useState(60000);
-  const [localScore, setLocalScore] = useState(60000);
+  const [score, setScore] = useState(6000);
+  const [localScore, setLocalScore] = useState(6000);
   const [message, setMessage] = useState('');
   const [timeLeft, setTimeLeft] = useState(4);
   const [gameStatus, setGameStatus] = useState('playing');
@@ -73,6 +73,9 @@ export default function Game() {
   
   // Estado para modal de administrador
   const [showAdminModal, setShowAdminModal] = useState(false);
+  
+  // Nuevo estado para el bloqueo por puntaje
+  const [isScoreLocked, setIsScoreLocked] = useState(false);
   
   const router = useRouter();
   
@@ -185,8 +188,13 @@ export default function Game() {
       console.log("Estado de usuario:", {
         username: user.username,
         isAdmin: user.isAdmin,
-        id: user.id
+        id: user.id,
+        isLockedDueToScore: user.isLockedDueToScore,
+        isBlocked: user.isBlocked
       });
+      
+      // Inicializar el estado de bloqueo por puntaje
+      setIsScoreLocked(user.isLockedDueToScore || false);
     }
   }, [user]);
 
@@ -201,16 +209,12 @@ export default function Game() {
     try {
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
-      setScore(parsedUser.score || 60000);
-      setLocalScore(parsedUser.score || 60000);
+      setScore(parsedUser.score || 6000);
+      setLocalScore(parsedUser.score || 6000);
+      setIsScoreLocked(parsedUser.isLockedDueToScore || false);
       
       // Inicializar referencia de puntuación
-      prevScoreRef.current = parsedUser.score || 60000;
-
-      if (parsedUser.isBlocked) {
-        setMessage('Tu cuenta está bloqueada. Contacta al administrador.');
-        return;
-      }
+      prevScoreRef.current = parsedUser.score || 6000;
 
       // Establecer un tablero local
       const initialBoard = generateLocalBoard();
@@ -280,6 +284,21 @@ export default function Game() {
         
         socket.emit('syncGameState', { userId: parsedUser.id });
         socket.emit('joinGame');
+      });
+
+      // Añadir manejo para el evento de límite de puntaje
+      socket.on('scoreLimitReached', ({ message }) => {
+        setIsScoreLocked(true);
+        setMessage(message);
+        setTimeout(() => {
+          setMessage('Tu cuenta está bloqueada por alcanzar 23000 puntos');
+        }, 5000);
+      });
+      
+      socket.on('userUnlocked', ({ message }) => {
+        setIsScoreLocked(false);
+        setMessage(message);
+        setTimeout(() => setMessage(''), 3000);
       });
 
       // Nuevo evento para manejar cambios en la conexión de jugadores
@@ -352,45 +371,22 @@ export default function Game() {
           gameState.status = 'playing';
         }
         
-        let needsNewBoard = false;
-        
-        if (!gameState.board || gameState.board.length === 0) {
-          needsNewBoard = true;
-        } else {
-          // Verificar si todas las fichas ya están reveladas
-          const allRevealed = gameState.board.every(tile => tile.revealed);
-          if (allRevealed) {
-            needsNewBoard = true;
-          }
-        }
-        
-        if (needsNewBoard) {
-          const newBoard = generateLocalBoard();
-          
-          if (gameState.board && gameState.board.length > 0) {
-            for (let i = 0; i < Math.min(newBoard.length, gameState.board.length); i++) {
-              if (gameState.board[i].revealed) {
-                newBoard[i].revealed = true;
-              }
+        // Mantener el estado actual del tablero sin reiniciar
+        setBoard(prev => {
+          const updatedBoard = [...prev];
+          // Solo actualizar las fichas que están reveladas en el estado del juego
+          for (let i = 0; i < Math.min(updatedBoard.length, gameState.board.length); i++) {
+            if (gameState.board[i].revealed) {
+              updatedBoard[i] = {
+                ...updatedBoard[i],
+                revealed: true,
+                selectedBy: gameState.board[i].selectedBy,
+                value: gameState.board[i].value || updatedBoard[i].value
+              };
             }
           }
-          
-          setBoard(newBoard);
-        } else {
-          setBoard(prev => {
-            const updatedBoard = [...prev];
-            for (let i = 0; i < Math.min(updatedBoard.length, gameState.board.length); i++) {
-              if (gameState.board[i].revealed) {
-                updatedBoard[i] = {
-                  ...updatedBoard[i],
-                  revealed: true,
-                  selectedBy: gameState.board[i].selectedBy
-                };
-              }
-            }
-            return updatedBoard;
-          });
-        }
+          return updatedBoard;
+        });
         
         // Verificar si ha cambiado el jugador actual
         const prevPlayerId = currentPlayer?.id;
@@ -517,11 +513,13 @@ export default function Game() {
         setTimeout(() => setMessage(''), 3000);
       });
 
+      // Modificado: El evento blocked ahora solo muestra un mensaje pero no redirecciona
       socket.on('blocked', () => {
-        setMessage('Tu cuenta ha sido bloqueada por el administrador.');
-        setTimeout(() => {
-          router.push('/');
-        }, 3000);
+        setMessage('Tu cuenta ha sido bloqueada por el administrador. Puedes ver el juego pero no jugar.');
+        // Eliminar la redirección
+        // setTimeout(() => {
+        //   router.push('/');
+        // }, 3000);
       });
 
       socket.on('message', (newMessage) => {
@@ -552,6 +550,8 @@ export default function Game() {
           socket.off('sessionClosed');
           socket.off('tablesUpdate');
           socket.off('playerConnectionChanged');
+          socket.off('scoreLimitReached');
+          socket.off('userUnlocked');
           socket.emit('leaveGame');
           socket.disconnect();
         }
@@ -630,6 +630,20 @@ export default function Game() {
 
   // Función para manejar clics en fichas
   const handleTileClick = useCallback((index) => {
+    // No permitir seleccionar fichas si está bloqueado por puntaje
+    if (isScoreLocked) {
+      setMessage("Tu cuenta está bloqueada por alcanzar 23000 puntos. Contacta al administrador.");
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+    
+    // No permitir seleccionar fichas si el usuario está bloqueado por el administrador
+    if (user?.isBlocked) {
+      setMessage("Tu cuenta está bloqueada. Puedes ver el juego pero no jugar.");
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+    
     // No permitir seleccionar fichas si se alcanzó el límite de mesas
     if (maxTablesReached) {
       setMessage(`Límite de mesas alcanzado. ${tableLockReason}`);
@@ -724,7 +738,7 @@ export default function Game() {
       tileIndex: index,
       currentScore: localScore // Enviar el puntaje actual para verificación
     });
-  }, [board, canSelectTiles, isYourTurn, timeLeft, rowSelections, localScore, maxTablesReached, tableLockReason, socket, showPointsAlert]);
+  }, [board, canSelectTiles, isYourTurn, timeLeft, rowSelections, localScore, maxTablesReached, tableLockReason, socket, showPointsAlert, isScoreLocked, user]);
 
   // Memoizar el tablero para evitar re-renderizados innecesarios
   const memoizedBoard = useMemo(() => (
@@ -741,7 +755,9 @@ export default function Game() {
             !canSelectTiles || 
             timeLeft <= 0 || 
             rowSelections[Math.floor(index / 4)] >= 2 ||
-            maxTablesReached
+            maxTablesReached ||
+            isScoreLocked ||
+            user?.isBlocked // Añadir verificación del estado de bloqueo
           }
           lastSelected={lastSelectedTile?.index === index}
           selectedBy={tile?.selectedBy}
@@ -762,7 +778,7 @@ export default function Game() {
         </button>
       </div>
     )
-  ), [board, canSelectTiles, timeLeft, rowSelections, lastSelectedTile, maxTablesReached, handleTileClick]);
+  ), [board, canSelectTiles, timeLeft, rowSelections, lastSelectedTile, maxTablesReached, isScoreLocked, user, handleTileClick]);
 
   if (!user) {
     return <div className="loading">Cargando...</div>;
@@ -828,6 +844,20 @@ export default function Game() {
             Puntaje: {localScore}
           </div>
 
+          {/* Mostrar mensaje de bloqueo por puntaje */}
+          {isScoreLocked && (
+            <div className="score-lock-banner">
+              Tu cuenta está bloqueada por alcanzar 23000 puntos. Contacta al administrador.
+            </div>
+          )}
+
+          {/* Mostrar mensaje de bloqueo por administrador */}
+          {user?.isBlocked && (
+            <div className="score-lock-banner">
+              Tu cuenta está bloqueada por el administrador. Puedes ver el juego pero no jugar.
+            </div>
+          )}
+
           {currentPlayer && (
             <div className="current-player">
               Jugador actual: {currentPlayer.username}
@@ -843,7 +873,6 @@ export default function Game() {
             )}
           </div>
           
-          {/* Información de mesas con el número actual */}
           <div className="tables-info">
             Mesa actual: {currentTableNumber} de 10
             {maxTablesReached && (
@@ -854,6 +883,7 @@ export default function Game() {
           {message && <div className="message">{message}</div>}
         </div>
 
+        {/* El tablero siempre se muestra, independientemente del estado de bloqueo */}
         <div className="game-board">
           {memoizedBoard}
         </div>

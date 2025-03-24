@@ -1,4 +1,4 @@
-// Actualización del componente AdminButton.jsx
+// AdminButton.jsx
 
 import { useState } from 'react';
 import '@/styles/AdminButton.css';
@@ -108,6 +108,29 @@ const AdminModal = ({ onClose, socket }) => {
     });
   };
 
+  const unlockUserScore = (playerId) => {
+    setStatus('Desbloqueando jugador por puntaje...');
+    socket.emit('unlockUserScore', { userId: playerId }, (response) => {
+      if (response.success) {
+        setStatus(`Jugador desbloqueado correctamente`);
+        
+        // Actualizar la lista de jugadores localmente
+        setPlayers(prev => 
+          prev.map(player => 
+            player.id === playerId 
+              ? { ...player, isLockedDueToScore: false } 
+              : player
+          )
+        );
+        
+        setTimeout(() => setStatus(''), 2000);
+      } else {
+        setStatus('Error al desbloquear jugador');
+        setTimeout(() => setStatus(''), 2000);
+      }
+    });
+  };
+
   const resetGame = () => {
     if (window.confirm('¿Estás seguro de que quieres reiniciar el juego?')) {
       setStatus('Reiniciando juego...');
@@ -148,6 +171,11 @@ const AdminModal = ({ onClose, socket }) => {
                     <span className={`player-status ${player.isBlocked ? 'blocked' : ''}`}>
                       {player.isBlocked ? 'Bloqueado' : 'Activo'}
                     </span>
+                    {player.isLockedDueToScore && (
+                      <span className="player-status score-locked">
+                        Bloqueado por puntaje
+                      </span>
+                    )}
                   </div>
                   <div className="player-controls">
                     <div className="points-control">
@@ -187,6 +215,14 @@ const AdminModal = ({ onClose, socket }) => {
                     >
                       Desbloquear Mesas
                     </button>
+                    {player.isLockedDueToScore && (
+                      <button 
+                        onClick={() => unlockUserScore(player.id)}
+                        className="unlock-score-btn"
+                      >
+                        Desbloquear Puntaje
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
