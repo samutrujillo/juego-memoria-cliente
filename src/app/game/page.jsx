@@ -108,13 +108,13 @@ export default function Game() {
   // Referencia para seguimiento de cambios en puntuación
   const prevScoreRef = useRef();
 
-  // Función segura para reproducir sonidos (ignora errores)
-  const playSoundSafely = (audioRef, volume = 1.0) => {
+  // Modificar la función playSoundSafely para manejar mejor los errores
+const playSoundSafely = (audioRef, volume = 1.0) => {
+  try {
     if (audioRef && audioRef.current) {
       audioRef.current.volume = volume;
       audioRef.current.currentTime = 0;
       
-      // Usar Promise.catch para manejar errores silenciosamente
       const playPromise = audioRef.current.play();
       if (playPromise !== undefined) {
         playPromise.catch(error => {
@@ -122,17 +122,27 @@ export default function Game() {
         });
       }
     }
-  };
+  } catch (error) {
+    console.log('Error capturado al reproducir sonido:', error);
+  }
+};
 
-  // Función para cerrar sesión y guardar el estado actual
-  const handleLogout = () => {
+// Añadir en la función handleLogout
+const handleLogout = () => {
+  try {
     if (socket) {
-      socket.emit('saveGameState', { userId: user.id });
+      socket.emit('saveGameState', { userId: user?.id });
       socket.disconnect();
     }
     sessionStorage.removeItem('user');
     router.push('/');
-  };
+  } catch (error) {
+    console.log('Error durante el cierre de sesión:', error);
+    // Intentar redirigir a la página de inicio de todos modos
+    sessionStorage.removeItem('user');
+    router.push('/');
+  }
+};
 
   // Función para mostrar la alerta (restaurada)
   const showPointsAlert = (points) => {
