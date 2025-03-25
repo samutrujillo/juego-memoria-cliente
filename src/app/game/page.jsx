@@ -87,7 +87,7 @@ export default function Game() {
   const [maxTablesReached, setMaxTablesReached] = useState(false);
   const [tableLockReason, setTableLockReason] = useState('');
   
-  // Estado para alertas
+  // Estado para alertas (restaurado para mostrar alertas)
   const [showAlert, setShowAlert] = useState(false);
   const [alertType, setAlertType] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
@@ -134,7 +134,7 @@ export default function Game() {
     router.push('/');
   };
 
-  // Función para mostrar la alerta
+  // Función para mostrar la alerta (restaurada)
   const showPointsAlert = (points) => {
     const isPositive = points > 0;
     setAlertType(isPositive ? 'success' : 'error');
@@ -155,8 +155,9 @@ export default function Game() {
     }, 2000);
   };
 
-  // Función para mostrar notificaciones de acciones de otros jugadores
+  // Función para mostrar notificaciones de acciones de otros jugadores (modificada)
   const showPlayerActionNotification = (username, value) => {
+    // Solo mostrar notificación de texto, sin alerta
     const isPositive = value > 0;
     const message = isPositive 
       ? `${username} ganó ${value} puntos` 
@@ -166,7 +167,7 @@ export default function Game() {
     setTimeout(() => setMessage(''), 2000);
   };
 
-  // Función para mostrar notificación de cambio de turno (modificada para no mostrar el mensaje)
+  // Función para mostrar notificación de cambio de turno
   const showTurnNotification = (player, isYourTurnNow) => {
     // Mantener solo el sonido para indicar el cambio de turno
     if (isYourTurnNow) {
@@ -553,10 +554,6 @@ export default function Game() {
           } else {
             setIsYourTurn(true);
           }
-          
-          // Eliminamos esta línea para que no aparezca el mensaje de tiempo agotado
-          // setMessage('¡Tu tiempo se agotó!');
-          // setTimeout(() => setMessage(''), 2000);
         }
       });
 
@@ -807,9 +804,6 @@ export default function Game() {
           
           // Incrementar contador de mesas mediante socket
           socket.emit('completeBoard', { userId: user.id });
-          
-          // No necesitamos hacer más acciones aquí, ya que el servidor enviará el evento
-          // 'boardReset' que manejamos en otro lugar
         }
         
         return updated;
@@ -901,6 +895,7 @@ export default function Game() {
      <audio ref={loseSoundRef} src="/sounds/lose.mp3" preload="auto"></audio>
      <audio ref={turnSoundRef} src="/sounds/turn.mp3" preload="auto"></audio>
      
+     {/* Restaurar la visualización de alertas de puntos */}
      {showAlert && (
        <div className={`points-alert ${alertType}`}>
          {alertMessage}
@@ -922,7 +917,7 @@ export default function Game() {
        )}
      </div>
 
-     {/* Mesa y turno en la parte superior, más grandes (60% más grandes) */}
+     {/* Mesa y turno en la parte superior */}
      <div className="game-status-bar">
        <div className="table-info">
          Mesa {currentTableNumber}
@@ -935,6 +930,11 @@ export default function Game() {
      {/* Puntaje después de mesa y turno */}
      <div className="game-score">
        Puntaje: {localScore}
+     </div>
+
+     {/* Contador de tiempo antes del tablero - CORREGIDO */}
+     <div className="time-display">
+       Tiempo: <span className={`timer-value ${timeLeft === 0 ? 'time-up' : ''}`}>{timeLeft}</span> segundos
      </div>
 
      {/* Mensajes de bloqueo */}
@@ -958,17 +958,12 @@ export default function Game() {
 
      {message && <div className="message">{message}</div>}
 
-     {/* Tablero de juego más grande */}
+     {/* Tablero de juego */}
      <div className="game-board">
        {memoizedBoard}
      </div>
 
-     {/* Contador de tiempo (ahora aparece primero) */}
-     <div className="time-display">
-       Tiempo: <span className={`timer-value ${timeLeft === 0 ? 'time-up' : ''}`}>{timeLeft}</span> segundos
-     </div>
-
-     {/* Jugador actual después del contador */}
+     {/* Jugador actual */}
      {currentPlayer && (
        <div className="current-player">
          Jugador actual: <span className="current-player-name">{currentPlayer.username}</span>

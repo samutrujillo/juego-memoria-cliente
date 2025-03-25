@@ -36,17 +36,22 @@
   background-color: #00cc00;
 }
 
+.tile.gray {
+  background-color: #888888;
+}
+
 .tile:hover:not(.revealed):not(.disabled) {
   transform: translateY(-5px);
   box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
 }
 
-.tile.revealed.winner {
-  background-color: #43a047;
+/* Cambiar color de fichas reveladas a gris */
+.tile.revealed {
+  background-color: #888888;
 }
 
-.tile.revealed.loser {
-  background-color: #e53935;
+.tile.revealed.winner, .tile.revealed.loser {
+  background-color: #888888;
 }
 
 .tile.disabled {
@@ -94,6 +99,13 @@
   transform: rotate(180deg);
 }
 
+/* Clases para los iconos de las fichas */
+.tile-icon {
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+}
+
 @keyframes pulse-highlight {
   0% { box-shadow: 0 0 0 rgba(255, 255, 255, 0); }
   50% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.7); }
@@ -112,7 +124,7 @@
   }
   
   /* Mantener proporción relativa en pantallas medianas */
-  .arrow-icon {
+  .arrow-icon, .tile-icon {
     width: 80%;
     height: 80%;
   }
@@ -137,7 +149,7 @@
   }
   
   /* Mantener proporción relativa en pantallas pequeñas */
-  .arrow-icon {
+  .arrow-icon, .tile-icon {
     width: 80%;
     height: 80%;
   }
@@ -151,7 +163,7 @@
   }
   
   /* Mantener proporción relativa en pantallas muy pequeñas */
-  .arrow-icon {
+  .arrow-icon, .tile-icon {
     width: 80%;
     height: 80%;
   }
