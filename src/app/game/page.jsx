@@ -155,16 +155,11 @@ export default function Game() {
     }, 2000);
   };
 
-  // Función para mostrar notificaciones de acciones de otros jugadores (modificada)
+  // Función para mostrar notificaciones de acciones de otros jugadores (eliminada)
+  // Esta función ya no muestra mensajes de puntos ganados/perdidos por otros jugadores
   const showPlayerActionNotification = (username, value) => {
-    // Solo mostrar notificación de texto, sin alerta
-    const isPositive = value > 0;
-    const message = isPositive 
-      ? `${username} ganó ${value} puntos` 
-      : `${username} perdió ${Math.abs(value)} puntos`;
-    
-    setMessage(message);
-    setTimeout(() => setMessage(''), 2000);
+    // No mostrar nada sobre puntos ganados o perdidos por otros jugadores
+    return;
   };
 
   // Función para mostrar notificación de cambio de turno
@@ -371,12 +366,12 @@ export default function Game() {
           )
         );
         
-        // Mostrar mensaje informativo
-        const message = isConnected 
+        // Mostrar mensaje informativo si un jugador se conecta o desconecta
+        const connectionMessage = isConnected 
           ? `${username} se ha reconectado al juego` 
           : `${username} se ha desconectado del juego`;
         
-        setMessage(message);
+        setMessage(connectionMessage);
         setTimeout(() => setMessage(''), 3000);
       });
 
@@ -532,12 +527,11 @@ export default function Game() {
         }
         
         if (isCurrentPlayer) {
-          // Usar el valor que viene del servidor
+          // Mostrar alerta solo para el jugador actual
           showPointsAlert(tileValue);
           updateLocalScore(newScore);
-        } else {
-          showPlayerActionNotification(playerUsername, tileValue);
         }
+        // Ya no mostramos notificaciones de puntos de otros jugadores
         
         if (rowSelections) {
           setRowSelections(rowSelections);
@@ -790,6 +784,7 @@ export default function Game() {
       });
       
       // Actualizar las selecciones de hilera y verificar si se debe avanzar al siguiente tablero
+      // Modificado para NO cambiar de tablero automáticamente si solo hay un jugador
       setRowSelections(prev => {
         const updated = [...prev];
         updated[row]++;
@@ -797,13 +792,14 @@ export default function Game() {
         // Verificar si se han completado las selecciones en todas las hileras
         const allRowsFull = updated.every(count => count >= 2);
         
-        // Si todas las hileras están completas y hay un solo jugador o somos el único activo,
-        // avanzar al siguiente tablero
-        if (allRowsFull && (players.length <= 1 || players.filter(p => p.isConnected).length <= 1)) {
-          console.log('Jugador único completó todas sus selecciones, avanzando al siguiente tablero');
-          
-          // Incrementar contador de mesas mediante socket
+        // Solo enviar completeBoard si hay múltiples jugadores activos
+        if (allRowsFull && players.length > 1 && players.filter(p => p.isConnected).length > 1) {
+          console.log('Múltiples jugadores completaron el tablero, avanzando al siguiente');
           socket.emit('completeBoard', { userId: user.id });
+        } else if (allRowsFull) {
+          console.log('Jugador único completó sus fichas, esperando más jugadores');
+          // Aquí no enviamos completeBoard, sólo notificamos al servidor
+          socket.emit('playerCompletedSelections', { userId: user.id });
         }
         
         return updated;
@@ -832,157 +828,157 @@ export default function Game() {
             !canSelectTiles || 
             timeLeft <= 0 || 
             rowSelections[Math.floor(index / 4)] >= 2 ||
-           maxTablesReached ||
-           isScoreLocked ||
-           user?.isBlocked ||
-           user?.isAdmin
-         }
-         lastSelected={lastSelectedTile?.index === index}
-         selectedBy={tile?.selectedBy}
-       />
-     ))
-   ) : (
-     <div className="loading-message">
-       Cargando tablero...
-       <button
-         onClick={() => {
-           if (socket) {
-             socket.emit('joinGame');
-           }
-         }}
-         className="retry-button"
-       >
-         Reintentar
-       </button>
-     </div>
-   )
- ), [board, canSelectTiles, timeLeft, rowSelections, lastSelectedTile, maxTablesReached, isScoreLocked, user, handleTileClick]);
+            maxTablesReached ||
+            isScoreLocked ||
+            user?.isBlocked ||
+            user?.isAdmin
+          }
+          lastSelected={lastSelectedTile?.index === index}
+          selectedBy={tile?.selectedBy}
+        />
+      ))
+    ) : (
+      <div className="loading-message">
+        Cargando tablero...
+        <button
+          onClick={() => {
+            if (socket) {
+              socket.emit('joinGame');
+            }
+          }}
+          className="retry-button"
+        >
+          Reintentar
+        </button>
+      </div>
+    )
+  ), [board, canSelectTiles, timeLeft, rowSelections, lastSelectedTile, maxTablesReached, isScoreLocked, user, handleTileClick]);
 
- if (!user) {
-   return <div className="loading">Cargando...</div>;
- }
+  if (!user) {
+    return <div className="loading">Cargando...</div>;
+  }
 
- return (
-   <>
-     {/* Componente para ocultar el logo programáticamente */}
-     <HideLogoEffect />
-     
-     {(user?.isAdmin || user?.username?.toLowerCase() === "admin") && (
-       <button 
-       style={{
-         position: 'fixed',
-         top: '20px',
-         right: '20px',
-         backgroundColor: '#ff4081',
-         color: 'white',
-         padding: '10px 20px',
-         borderRadius: '4px',
-         fontWeight: 'bold',
-         zIndex: 10000,
-         cursor: 'pointer',
-         boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
-         border: 'none',
-         fontSize: '14px'
-       }}
-       onClick={handleAdminPanel}
-     >
-       Panel de Admin
-     </button>
-   )}
- 
-   <div className="game-container game-page">
-     <audio ref={winSoundRef} src="/sounds/win.mp3" preload="auto"></audio>
-     <audio ref={loseSoundRef} src="/sounds/lose.mp3" preload="auto"></audio>
-     <audio ref={turnSoundRef} src="/sounds/turn.mp3" preload="auto"></audio>
-     
-     {/* Restaurar la visualización de alertas de puntos */}
-     {showAlert && (
-       <div className={`points-alert ${alertType}`}>
-         {alertMessage}
-       </div>
-     )}
-     
-     <div className="game-info">
-       <div className="game-header">
-         <h2>Jugador: {user?.username}</h2>
-         <button className="logout-button" onClick={handleLogout}>
-           Cerrar Sesión
-         </button>
-       </div>
-       
-       {isConnected ? (
-         <div className="connection-status connected">Conectado al servidor</div>
-       ) : (
-         <div className="connection-status disconnected">Desconectado del servidor</div>
-       )}
-     </div>
+  return (
+    <>
+      {/* Componente para ocultar el logo programáticamente */}
+      <HideLogoEffect />
+      
+      {(user?.isAdmin || user?.username?.toLowerCase() === "admin") && (
+        <button 
+        style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          backgroundColor: '#ff4081',
+          color: 'white',
+          padding: '10px 20px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          zIndex: 10000,
+          cursor: 'pointer',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+          border: 'none',
+          fontSize: '14px'
+        }}
+        onClick={handleAdminPanel}
+      >
+        Panel de Admin
+      </button>
+    )}
+  
+    <div className="game-container game-page">
+      <audio ref={winSoundRef} src="/sounds/win.mp3" preload="auto"></audio>
+      <audio ref={loseSoundRef} src="/sounds/lose.mp3" preload="auto"></audio>
+      <audio ref={turnSoundRef} src="/sounds/turn.mp3" preload="auto"></audio>
+      
+      {/* Mostrar alertas solo para el jugador actual */}
+      {showAlert && (
+        <div className={`points-alert ${alertType}`}>
+          {alertMessage}
+        </div>
+      )}
+      
+      <div className="game-info">
+        <div className="game-header">
+          <h2>Jugador: {user?.username}</h2>
+          <button className="logout-button" onClick={handleLogout}>
+            Cerrar Sesión
+          </button>
+        </div>
+        
+        {isConnected ? (
+          <div className="connection-status connected">Conectado al servidor</div>
+        ) : (
+          <div className="connection-status disconnected">Desconectado del servidor</div>
+        )}
+      </div>
 
-     {/* Mesa y turno en la parte superior */}
-     <div className="game-status-bar">
-       <div className="table-info">
-         Mesa {currentTableNumber}
-       </div>
-       <div className={`turn-status ${isYourTurn ? 'your-turn-indicator' : 'wait-turn-indicator'}`}>
-         {isYourTurn ? "Tu turno" : "Espere su turno"}
-       </div>
-     </div>
+      {/* Mesa y turno en la parte superior */}
+      <div className="game-status-bar">
+        <div className="table-info">
+          Mesa {currentTableNumber}
+        </div>
+        <div className={`turn-status ${isYourTurn ? 'your-turn-indicator' : 'wait-turn-indicator'}`}>
+          {isYourTurn ? "Tu turno" : "Espere su turno"}
+        </div>
+      </div>
 
-     {/* Puntaje después de mesa y turno */}
-     <div className="game-score">
-       Puntaje: {localScore}
-     </div>
+      {/* Puntaje después de mesa y turno */}
+      <div className="game-score">
+        Puntaje: {localScore}
+      </div>
 
-     {/* Contador de tiempo antes del tablero - CORREGIDO */}
-     <div className="time-display">
-       Tiempo: <span className={`timer-value ${timeLeft === 0 ? 'time-up' : ''}`}>{timeLeft}</span> segundos
-     </div>
+      {/* Contador de tiempo antes del tablero */}
+      <div className="time-display">
+        Tiempo: <span className={`timer-value ${timeLeft === 0 ? 'time-up' : ''}`}>{timeLeft}</span> segundos
+      </div>
 
-     {/* Mensajes de bloqueo */}
-     {isScoreLocked && (
-       <div className="score-lock-banner">
-         Tu cuenta está bloqueada por alcanzar 23000 puntos. Contacta al administrador.
-       </div>
-     )}
+      {/* Mensajes de bloqueo */}
+      {isScoreLocked && (
+        <div className="score-lock-banner">
+          Tu cuenta está bloqueada por alcanzar 23000 puntos. Contacta al administrador.
+        </div>
+      )}
 
-     {user?.isBlocked && (
-       <div className="score-lock-banner">
-         Tu cuenta está bloqueada por el administrador. Puedes ver el juego pero no jugar.
-       </div>
-     )}
+      {user?.isBlocked && (
+        <div className="score-lock-banner">
+          Tu cuenta está bloqueada por el administrador. Puedes ver el juego pero no jugar.
+        </div>
+      )}
 
-     {user?.isAdmin && (
-       <div className="admin-info-banner">
-         Modo administrador: Solo puedes observar el juego.
-       </div>
-     )}
+      {user?.isAdmin && (
+        <div className="admin-info-banner">
+          Modo administrador: Solo puedes observar el juego.
+        </div>
+      )}
 
-     {message && <div className="message">{message}</div>}
+      {message && <div className="message">{message}</div>}
 
-     {/* Tablero de juego */}
-     <div className="game-board">
-       {memoizedBoard}
-     </div>
+      {/* Tablero de juego */}
+      <div className="game-board">
+        {memoizedBoard}
+      </div>
 
-     {/* Jugador actual */}
-     {currentPlayer && (
-       <div className="current-player">
-         Jugador actual: <span className="current-player-name">{currentPlayer.username}</span>
-       </div>
-     )}
-     
-     {/* Lista de jugadores conectados */}
-     <div className="players-section">
-       <h3>Jugadores conectados</h3>
-       <PlayerList players={players} currentPlayerId={currentPlayer?.id} />
-     </div>
-     
-     {showAdminModal && (
-       <AdminButton 
-         onClose={() => setShowAdminModal(false)} 
-         socket={socket}
-       />
-     )}
-   </div>
- </>
- );
+      {/* Jugador actual */}
+      {currentPlayer && (
+        <div className="current-player">
+          Jugador actual: <span className="current-player-name">{currentPlayer.username}</span>
+        </div>
+      )}
+      
+      {/* Lista de jugadores conectados */}
+      <div className="players-section">
+        <h3>Jugadores conectados</h3>
+        <PlayerList players={players} currentPlayerId={currentPlayer?.id} />
+      </div>
+      
+      {showAdminModal && (
+        <AdminButton 
+          onClose={() => setShowAdminModal(false)} 
+          socket={socket}
+        />
+      )}
+    </div>
+  </>
+  );
 }
