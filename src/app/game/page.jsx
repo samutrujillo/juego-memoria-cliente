@@ -103,15 +103,23 @@ export default function Game() {
   // Referencias para los sonidos
   const winSoundRef = useRef(null);
   const loseSoundRef = useRef(null);
-  const turnSoundRef = useRef(null);
   
   // Referencia para seguimiento de cambios en puntuación
   const prevScoreRef = useRef();
 
   // Función segura para reproducir sonidos (ignora errores)
-  const playSoundSafely = (audioRef, volume = 1.0) => {
+  const playSoundSafely = (audioRef, volume = 1.0, forcePlay = false) => {
     if (audioRef && audioRef.current) {
-      audioRef.current.volume = volume;
+      // Si no es el jugador actual y forcePlay es false, no reproducir
+      if (!forcePlay) {
+        audioRef.current.volume = volume;
+      } else {
+        // Volumen muy bajo para sonidos de otros jugadores
+        audioRef.current.volume = 0.05;
+      }
+      
+      // Reseteamos la reproducción
+      audioRef.current.pause();
       audioRef.current.currentTime = 0;
       
       // Usar Promise.catch para manejar errores silenciosamente
@@ -296,6 +304,13 @@ export default function Game() {
         setTimeout(() => setMessage(''), 3000);
       });
 
+      // Nuevo evento para detección de errores en selección de fichas
+      socket.on('tileSelectError', ({ message }) => {
+        console.log('Error en selección de ficha:', message);
+        // Sincronizar estado con el servidor
+        socket.emit('syncGameState', { userId: parsedUser.id });
+      });
+
       // Nuevo evento para cambios de estado de bloqueo en tiempo real
       socket.on('blockStatusChanged', ({ isBlocked, isLockedDueToScore, message }) => {
         if (isBlocked !== undefined) {
@@ -435,13 +450,6 @@ export default function Game() {
         const isCurrentUserTurn = (gameState.players && gameState.players.length <= 1) || 
           (gameState.currentPlayer && gameState.currentPlayer.id === parsedUser.id);
         
-        if (prevPlayerId !== newPlayerId && gameState.currentPlayer) {
-          // Actualización del manejo del cambio de turno
-          if (isCurrentUserTurn) {
-            playSoundSafely(turnSoundRef);
-          }
-        }
-        
         setIsYourTurn(isCurrentUserTurn);
         
         if (isCurrentUserTurn) {
@@ -477,7 +485,7 @@ export default function Game() {
         }
       });
 
-      socket.on('tileSelected', ({ tileIndex, tileValue, playerId, newScore, rowSelections, soundType, playerUsername, timestamp }) => {
+      socket.on('tileSelected', ({ tileIndex, tileValue, playerId, newScore, rowSelections, soundType, playerUsername, timestamp, isRevealed }) => {
         // Actualizar el tablero para todos los jugadores
         setBoard(prevBoard => {
           const newBoard = [...prevBoard];
@@ -501,25 +509,24 @@ export default function Game() {
           timestamp: timestamp
         });
         
+        // Determinar si es el jugador actual
         const isCurrentPlayer = playerId === parsedUser.id;
         
         // Determinar el tipo de sonido basado en el valor real
         const isPositiveValue = tileValue > 0;
         if (isPositiveValue) {
-          playSoundSafely(winSoundRef, isCurrentPlayer ? 1.0 : 0.3);
+          // Solo reproducir a volumen normal si es el jugador actual, o a volumen muy bajo si es otro
+          playSoundSafely(winSoundRef, isCurrentPlayer ? 1.0 : 0, !isCurrentPlayer);
         } else {
-          playSoundSafely(loseSoundRef, isCurrentPlayer ? 1.0 : 0.3);
+          playSoundSafely(loseSoundRef, isCurrentPlayer ? 1.0 : 0, !isCurrentPlayer);
         }
         
+        // Mostrar alerta y actualizar puntaje solo para el jugador actual
         if (isCurrentPlayer) {
           // Usar el valor que viene del servidor
           showPointsAlert(tileValue);
           updateLocalScore(newScore);
         }
-        // ELIMINADO: Ya no mostramos notificaciones de otros jugadores
-        // else {
-        //   showPlayerActionNotification(playerUsername, tileValue);
-        // }
         
         if (rowSelections) {
           setRowSelections(rowSelections);
@@ -575,6 +582,7 @@ export default function Game() {
           socket.off('reconnect_attempt');
           socket.off('gameState');
           socket.off('tileSelected');
+          socket.off('tileSelectError');
           socket.off('turnTimeout');
           socket.off('scoreUpdate');
           socket.off('forceScoreUpdate');
@@ -751,15 +759,8 @@ export default function Game() {
       
       // Determinar el tipo de sonido basado en el valor real
       const isPositiveValue = tileValue > 0;
-      if (isPositiveValue) {
-        playSoundSafely(winSoundRef);
-      } else {
-        playSoundSafely(loseSoundRef);
-      }
       
-      // Mostrar alerta con el valor correcto
-      showPointsAlert(tileValue);
-      
+      // Actualizar el tablero localmente para feedback inmediato
       setBoard(prevBoard => {
         const newBoard = [...prevBoard];
         if (newBoard[index]) {
@@ -798,7 +799,7 @@ export default function Game() {
       tileIndex: index,
       currentScore: localScore // Enviar el puntaje actual para verificación
     });
-  }, [board, canSelectTiles, isYourTurn, timeLeft, rowSelections, localScore, maxTablesReached, tableLockReason, socket, showPointsAlert, isScoreLocked, user, players]);
+  }, [board, canSelectTiles, isYourTurn, timeLeft, rowSelections, localScore, maxTablesReached, tableLockReason, socket, isScoreLocked, user, players]);
 
   // Memoizar el tablero para evitar re-renderizados innecesarios
   const memoizedBoard = useMemo(() => (
@@ -876,7 +877,6 @@ export default function Game() {
       <div className="game-container game-page">
         <audio ref={winSoundRef} src="/sounds/win.mp3" preload="auto"></audio>
         <audio ref={loseSoundRef} src="/sounds/lose.mp3" preload="auto"></audio>
-        <audio ref={turnSoundRef} src="/sounds/turn.mp3" preload="auto"></audio>
         
         {/* Restaurar las alertas de puntos, pero solo para el jugador actual */}
         {showAlert && (
