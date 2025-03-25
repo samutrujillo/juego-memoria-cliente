@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import io from 'socket.io-client';
 import PlayerList from '@/components/PlayerList';
@@ -8,9 +8,6 @@ import Tile from '@/components/Tile';
 import AdminButton from '@/components/AdminButton';
 import '@/styles/GameBoard.css';
 import config from '@/config';
-
-// Flag para desactivar los sonidos temporalmente
-const soundsEnabled = false;
 
 let socket;
 
@@ -103,7 +100,7 @@ export default function Game() {
   
   const router = useRouter();
   
-  // Referencias para los sonidos (mantenemos las referencias aunque no se usen)
+  // Referencias para los sonidos
   const winSoundRef = useRef(null);
   const loseSoundRef = useRef(null);
   const turnSoundRef = useRef(null);
@@ -111,27 +108,30 @@ export default function Game() {
   // Referencia para seguimiento de cambios en puntuación
   const prevScoreRef = useRef();
 
-  // Función segura para reproducir sonidos (desactivada)
-  const playSoundSafely = () => {
-    // Función vacía que no hace nada
-    return;
+  // Función segura para reproducir sonidos (ignora errores)
+  const playSoundSafely = (audioRef, volume = 1.0) => {
+    if (audioRef && audioRef.current) {
+      audioRef.current.volume = volume;
+      audioRef.current.currentTime = 0;
+      
+      // Usar Promise.catch para manejar errores silenciosamente
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.log('Error reproduciendo sonido (ignorado):', error);
+        });
+      }
+    }
   };
 
   // Función para cerrar sesión y guardar el estado actual
   const handleLogout = () => {
-    try {
-      if (socket && socket.connected) {
-        socket.emit('saveGameState', { userId: user?.id });
-        socket.disconnect();
-      }
-      sessionStorage.removeItem('user');
-      router.push('/');
-    } catch (error) {
-      console.log('Error durante el cierre de sesión:', error);
-      // Intentar redirigir a la página de inicio de todos modos
-      sessionStorage.removeItem('user');
-      router.push('/');
+    if (socket) {
+      socket.emit('saveGameState', { userId: user.id });
+      socket.disconnect();
     }
+    sessionStorage.removeItem('user');
+    router.push('/');
   };
 
   // Función para mostrar la alerta (restaurada)
@@ -143,16 +143,28 @@ export default function Game() {
       : `¡Perdiste ${Math.abs(points)} puntos!`);
     setShowAlert(true);
     
+    // Reproducir el sonido correspondiente
+    if (isPositive) {
+      playSoundSafely(winSoundRef);
+    } else {
+      playSoundSafely(loseSoundRef);
+    }
+    
     setTimeout(() => {
       setShowAlert(false);
     }, 2000);
   };
 
-  // Función para mostrar notificaciones de acciones de otros jugadores (eliminada)
-  // Esta función ya no muestra mensajes de puntos ganados/perdidos por otros jugadores
+  // Función para mostrar notificaciones de acciones de otros jugadores (modificada)
   const showPlayerActionNotification = (username, value) => {
-    // No mostrar nada sobre puntos ganados o perdidos por otros jugadores
-    return;
+    // Solo mostrar notificación de texto, sin alerta
+    const isPositive = value > 0;
+    const message = isPositive 
+      ? `${username} ganó ${value} puntos` 
+      : `${username} perdió ${Math.abs(value)} puntos`;
+    
+    setMessage(message);
+    setTimeout(() => setMessage(''), 2000);
   };
 
   // Función para mostrar notificación de cambio de turno
@@ -255,7 +267,7 @@ export default function Game() {
         
         setGameStatus('playing');
         
-        if (players && Array.isArray(players) && players.length <= 1) {
+        if (players.length <= 1) {
           setIsYourTurn(true);
         }
       });
@@ -265,7 +277,7 @@ export default function Game() {
         setMessage('Error de conexión con el servidor. Reintentando...');
         
         setTimeout(() => {
-          if (socket && !socket.connected) {
+          if (!socket.connected) {
             socket.connect();
           }
         }, 2000);
@@ -310,7 +322,7 @@ export default function Game() {
       // Nuevo evento para cambios de estado de bloqueo en tiempo real
       socket.on('blockStatusChanged', ({ isBlocked, isLockedDueToScore, message }) => {
         if (isBlocked !== undefined) {
-          setUser(prev => prev ? ({ ...prev, isBlocked }) : null);
+          setUser(prev => ({ ...prev, isBlocked }));
           
           // Actualizar los datos del usuario en sessionStorage
           try {
@@ -327,7 +339,7 @@ export default function Game() {
         
         if (isLockedDueToScore !== undefined) {
           setIsScoreLocked(isLockedDueToScore);
-          setUser(prev => prev ? ({ ...prev, isLockedDueToScore }) : null);
+          setUser(prev => ({ ...prev, isLockedDueToScore }));
           
           // Actualizar los datos del usuario en sessionStorage
           try {
@@ -351,22 +363,20 @@ export default function Game() {
       // Nuevo evento para manejar cambios en la conexión de jugadores
       socket.on('playerConnectionChanged', ({ playerId, isConnected, username }) => {
         // Actualizar la lista de jugadores localmente
-        setPlayers(prevPlayers => {
-          if (!prevPlayers || !Array.isArray(prevPlayers)) return [];
-          
-          return prevPlayers.map(player => 
+        setPlayers(prevPlayers => 
+          prevPlayers.map(player => 
             player.id === playerId 
               ? { ...player, isConnected } 
               : player
-          );
-        });
+          )
+        );
         
-        // Mostrar mensaje informativo si un jugador se conecta o desconecta
-        const connectionMessage = isConnected 
+        // Mostrar mensaje informativo
+        const message = isConnected 
           ? `${username} se ha reconectado al juego` 
           : `${username} se ha desconectado del juego`;
         
-        setMessage(connectionMessage);
+        setMessage(message);
         setTimeout(() => setMessage(''), 3000);
       });
 
@@ -398,7 +408,7 @@ export default function Game() {
         }
         
         // Reiniciar completamente el tablero con el tablero nuevo
-        if (newBoard && Array.isArray(newBoard)) {
+        if (newBoard) {
           setBoard(prevBoard => {
             // Crear un nuevo tablero basado en el recibido, pero sin revelar ninguna ficha
             return newBoard.map(tile => ({
@@ -416,32 +426,22 @@ export default function Game() {
       });
 
       socket.on('gameState', (gameState) => {
-        if (gameState.players && Array.isArray(gameState.players) && gameState.players.length <= 1) {
+        if (gameState.players && gameState.players.length <= 1) {
           gameState.status = 'playing';
         }
         
         // Mantener el estado actual del tablero sin reiniciar
         setBoard(prev => {
-          // Verificar que prev sea un array válido
-          if (!Array.isArray(prev) || prev.length === 0) {
-            // Si no hay tablero previo válido, usar el del estado del juego o generar uno nuevo
-            return Array.isArray(gameState.board) && gameState.board.length > 0 
-              ? gameState.board 
-              : generateLocalBoard();
-          }
-
           const updatedBoard = [...prev];
           // Solo actualizar las fichas que están reveladas en el estado del juego
-          if (Array.isArray(gameState.board)) {
-            for (let i = 0; i < Math.min(updatedBoard.length, gameState.board.length); i++) {
-              if (gameState.board[i] && gameState.board[i].revealed) {
-                updatedBoard[i] = {
-                  ...updatedBoard[i],
-                  revealed: true,
-                  selectedBy: gameState.board[i].selectedBy,
-                  value: gameState.board[i].value || updatedBoard[i].value
-                };
-              }
+          for (let i = 0; i < Math.min(updatedBoard.length, gameState.board.length); i++) {
+            if (gameState.board[i].revealed) {
+              updatedBoard[i] = {
+                ...updatedBoard[i],
+                revealed: true,
+                selectedBy: gameState.board[i].selectedBy,
+                value: gameState.board[i].value || updatedBoard[i].value
+              };
             }
           }
           return updatedBoard;
@@ -452,12 +452,11 @@ export default function Game() {
         const newPlayerId = gameState.currentPlayer?.id;
         
         setCurrentPlayer(gameState.currentPlayer);
-        setPlayers(Array.isArray(gameState.players) ? gameState.players : []);
+        setPlayers(gameState.players || []);
         setGameStatus(gameState.status || 'playing');
         
-        const isCurrentUserTurn = 
-          (Array.isArray(gameState.players) && gameState.players.length <= 1) || 
-          (gameState.currentPlayer && gameState.currentPlayer.id === (user ? user.id : null));
+        const isCurrentUserTurn = (gameState.players && gameState.players.length <= 1) || 
+          (gameState.currentPlayer && gameState.currentPlayer.id === parsedUser.id);
         
         if (prevPlayerId !== newPlayerId && gameState.currentPlayer) {
           showTurnNotification(gameState.currentPlayer, isCurrentUserTurn);
@@ -470,7 +469,7 @@ export default function Game() {
           setCanSelectTiles(true);
         }
         
-        if (gameState.rowSelections && Array.isArray(gameState.rowSelections)) {
+        if (gameState.rowSelections) {
           setRowSelections(gameState.rowSelections);
         }
       });
@@ -499,19 +498,8 @@ export default function Game() {
       });
 
       socket.on('tileSelected', ({ tileIndex, tileValue, playerId, newScore, rowSelections, soundType, playerUsername, timestamp }) => {
-        // Verificar que tileIndex es válido
-        if (tileIndex === undefined || tileIndex === null) {
-          console.error('tileSelected recibido con tileIndex inválido', { tileIndex });
-          return;
-        }
-
         // Actualizar el tablero para todos los jugadores
         setBoard(prevBoard => {
-          // Validar que prevBoard es un array
-          if (!Array.isArray(prevBoard) || prevBoard.length === 0) {
-            return prevBoard;
-          }
-
           const newBoard = [...prevBoard];
           if (newBoard[tileIndex]) {
             newBoard[tileIndex] = { 
@@ -533,7 +521,7 @@ export default function Game() {
           timestamp: timestamp
         });
         
-        const isCurrentPlayer = playerId === (user ? user.id : null);
+        const isCurrentPlayer = playerId === parsedUser.id;
         
         // Determinar el tipo de sonido basado en el valor real
         const isPositiveValue = tileValue > 0;
@@ -544,23 +532,24 @@ export default function Game() {
         }
         
         if (isCurrentPlayer) {
-          // Mostrar alerta solo para el jugador actual
+          // Usar el valor que viene del servidor
           showPointsAlert(tileValue);
           updateLocalScore(newScore);
+        } else {
+          showPlayerActionNotification(playerUsername, tileValue);
         }
-        // Ya no mostramos notificaciones de puntos de otros jugadores
         
-        if (rowSelections && Array.isArray(rowSelections)) {
+        if (rowSelections) {
           setRowSelections(rowSelections);
         }
       });
 
       socket.on('turnTimeout', ({ playerId }) => {
-        if (playerId === (user ? user.id : null)) {
+        if (playerId === parsedUser.id) {
           setTimeLeft(0);
           setCanSelectTiles(false);
           
-          if (Array.isArray(players) && players.length > 1) {
+          if (players.length > 1) {
             setIsYourTurn(false);
           } else {
             setIsYourTurn(true);
@@ -660,15 +649,11 @@ export default function Game() {
 
   // Efecto para limpiar la marca de última ficha seleccionada
   useEffect(() => {
-    if (lastSelectedTile && lastSelectedTile.index !== undefined && lastSelectedTile.index !== null) {
+    if (lastSelectedTile) {
       const timer = setTimeout(() => {
         setBoard(prevBoard => {
-          if (!prevBoard || !Array.isArray(prevBoard)) return prevBoard;
-          
           const newBoard = [...prevBoard];
-          if (newBoard[lastSelectedTile.index] && 
-              typeof newBoard[lastSelectedTile.index] === 'object' && 
-              newBoard[lastSelectedTile.index].lastSelected) {
+          if (newBoard[lastSelectedTile.index] && newBoard[lastSelectedTile.index].lastSelected) {
             newBoard[lastSelectedTile.index] = {
               ...newBoard[lastSelectedTile.index],
               lastSelected: false
@@ -729,12 +714,6 @@ export default function Game() {
       return;
     }
     
-    // Verificar que el tablero y el índice son válidos
-    if (!Array.isArray(board) || board.length === 0 || index < 0 || index >= board.length) {
-      console.error('Índice de ficha inválido o tablero no inicializado', { index, boardLength: board?.length });
-      return;
-    }
-    
     if (board[index]?.revealed) {
       return;
     }
@@ -745,7 +724,7 @@ export default function Game() {
       return;
     }
     
-    if (!isYourTurn && Array.isArray(players) && players.length > 1) {
+    if (!isYourTurn && players.length > 1) {
       setMessage("¡Espera tu turno!");
       setTimeout(() => setMessage(''), 2000);
       return;
@@ -758,12 +737,6 @@ export default function Game() {
     }
     
     const row = Math.floor(index / 4);
-    
-    // Verificar que rowSelections es un array válido antes de acceder a sus elementos
-    if (!Array.isArray(rowSelections) || rowSelections.length <= row) {
-      console.error('Array rowSelections inválido', { rowSelections });
-      return;
-    }
     
     if (rowSelections[row] >= 2) {
       setMessage(`¡Límite de 2 fichas por hilera alcanzado en hilera ${row + 1}!`);
@@ -805,12 +778,6 @@ export default function Game() {
       showPointsAlert(tileValue);
       
       setBoard(prevBoard => {
-        // Verificar que prevBoard es un array válido
-        if (!Array.isArray(prevBoard) || prevBoard.length === 0) {
-          console.error('Tablero inválido al intentar actualizar', { prevBoard });
-          return prevBoard;
-        }
-        
         const newBoard = [...prevBoard];
         if (newBoard[index]) {
           newBoard[index] = { 
@@ -823,33 +790,20 @@ export default function Game() {
       });
       
       // Actualizar las selecciones de hilera y verificar si se debe avanzar al siguiente tablero
-      // Modificado para NO cambiar de tablero automáticamente si solo hay un jugador
       setRowSelections(prev => {
-        // Verificar que prev es un array válido
-        if (!Array.isArray(prev)) {
-          console.error('Array de selecciones inválido', { prev });
-          return [0, 0, 0, 0]; // Reiniciar a valores predeterminados
-        }
-        
         const updated = [...prev];
         updated[row]++;
         
         // Verificar si se han completado las selecciones en todas las hileras
         const allRowsFull = updated.every(count => count >= 2);
         
-        // Solo enviar completeBoard si hay múltiples jugadores activos
-        if (allRowsFull && Array.isArray(players) && players.length > 1 && 
-            players.filter(p => p && p.isConnected).length > 1) {
-          console.log('Múltiples jugadores completaron el tablero, avanzando al siguiente');
-          if (socket && socket.connected) {
-            socket.emit('completeBoard', { userId: user?.id });
-          }
-        } else if (allRowsFull) {
-          console.log('Jugador único completó sus fichas, esperando más jugadores');
-          // Aquí no enviamos completeBoard, sólo notificamos al servidor
-          if (socket && socket.connected) {
-            socket.emit('playerCompletedSelections', { userId: user?.id });
-          }
+        // Si todas las hileras están completas y hay un solo jugador o somos el único activo,
+        // avanzar al siguiente tablero
+        if (allRowsFull && (players.length <= 1 || players.filter(p => p.isConnected).length <= 1)) {
+          console.log('Jugador único completó todas sus selecciones, avanzando al siguiente tablero');
+          
+          // Incrementar contador de mesas mediante socket
+          socket.emit('completeBoard', { userId: user.id });
         }
         
         return updated;
@@ -857,12 +811,10 @@ export default function Game() {
     }
     
     // Emisión al servidor con información completa
-    if (socket && socket.connected) {
-      socket.emit('selectTile', { 
-        tileIndex: index,
-        currentScore: localScore // Enviar el puntaje actual para verificación
-      });
-    }
+    socket.emit('selectTile', { 
+      tileIndex: index,
+      currentScore: localScore // Enviar el puntaje actual para verificación
+    });
   }, [board, canSelectTiles, isYourTurn, timeLeft, rowSelections, localScore, maxTablesReached, tableLockReason, socket, showPointsAlert, isScoreLocked, user, players]);
 
   // Memoizar el tablero para evitar re-renderizados innecesarios
@@ -879,165 +831,158 @@ export default function Game() {
             tile?.revealed || 
             !canSelectTiles || 
             timeLeft <= 0 || 
-            (Array.isArray(rowSelections) && 
-             rowSelections.length > Math.floor(index / 4) && 
-             rowSelections[Math.floor(index / 4)] >= 2) ||
-            maxTablesReached ||
-            isScoreLocked ||
-            user?.isBlocked ||
-            user?.isAdmin
-          }
-          lastSelected={lastSelectedTile?.index === index}
-          selectedBy={tile?.selectedBy}
-        />
-      ))
-    ) : (
-      <div className="loading-message">
-        Cargando tablero...
-        <button
-          onClick={() => {
-            if (socket && socket.connected) {
-              socket.emit('joinGame');
-            }
-          }}
-          className="retry-button"
-        >
-          Reintentar
-        </button>
-      </div>
-    )
-  ), [board, canSelectTiles, timeLeft, rowSelections, lastSelectedTile, maxTablesReached, isScoreLocked, user, handleTileClick]);
+            rowSelections[Math.floor(index / 4)] >= 2 ||
+           maxTablesReached ||
+           isScoreLocked ||
+           user?.isBlocked ||
+           user?.isAdmin
+         }
+         lastSelected={lastSelectedTile?.index === index}
+         selectedBy={tile?.selectedBy}
+       />
+     ))
+   ) : (
+     <div className="loading-message">
+       Cargando tablero...
+       <button
+         onClick={() => {
+           if (socket) {
+             socket.emit('joinGame');
+           }
+         }}
+         className="retry-button"
+       >
+         Reintentar
+       </button>
+     </div>
+   )
+ ), [board, canSelectTiles, timeLeft, rowSelections, lastSelectedTile, maxTablesReached, isScoreLocked, user, handleTileClick]);
 
-  if (!user) {
-    return <div className="loading">Cargando...</div>;
-  }
+ if (!user) {
+   return <div className="loading">Cargando...</div>;
+ }
 
-  return (
-    <>
-      {/* Componente para ocultar el logo programáticamente */}
-      <HideLogoEffect />
-      
-      {(user?.isAdmin || user?.username?.toLowerCase() === "admin") && (
-        <button 
-        style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          backgroundColor: '#ff4081',
-          color: 'white',
-          padding: '10px 20px',
-          borderRadius: '4px',
-          fontWeight: 'bold',
-          zIndex: 10000,
-          cursor: 'pointer',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
-          border: 'none',
-          fontSize: '14px'
-        }}
-        onClick={handleAdminPanel}
-      >
-        Panel de Admin
-      </button>
-    )}
-  
-    <div className="game-container game-page">
-      {/* Referencias a audio desactivadas para evitar errores */}
-      {soundsEnabled && (
-        <>
-          <audio ref={winSoundRef} src="/sounds/win.mp3" preload="auto"></audio>
-          <audio ref={loseSoundRef} src="/sounds/lose.mp3" preload="auto"></audio>
-          <audio ref={turnSoundRef} src="/sounds/turn.mp3" preload="auto"></audio>
-        </>
-      )}
-      
-      {/* Mostrar alertas solo para el jugador actual */}
-      {showAlert && (
-        <div className={`points-alert ${alertType}`}>
-          {alertMessage}
-        </div>
-      )}
-      
-      <div className="game-info">
-        <div className="game-header">
-          <h2>Jugador: {user?.username}</h2>
-          <button className="logout-button" onClick={handleLogout}>
-            Cerrar Sesión
-          </button>
-        </div>
-        
-        {isConnected ? (
-          <div className="connection-status connected">Conectado al servidor</div>
-        ) : (
-          <div className="connection-status disconnected">Desconectado del servidor</div>
-        )}
-      </div>
+ return (
+   <>
+     {/* Componente para ocultar el logo programáticamente */}
+     <HideLogoEffect />
+     
+     {(user?.isAdmin || user?.username?.toLowerCase() === "admin") && (
+       <button 
+       style={{
+         position: 'fixed',
+         top: '20px',
+         right: '20px',
+         backgroundColor: '#ff4081',
+         color: 'white',
+         padding: '10px 20px',
+         borderRadius: '4px',
+         fontWeight: 'bold',
+         zIndex: 10000,
+         cursor: 'pointer',
+         boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+         border: 'none',
+         fontSize: '14px'
+       }}
+       onClick={handleAdminPanel}
+     >
+       Panel de Admin
+     </button>
+   )}
+ 
+   <div className="game-container game-page">
+     <audio ref={winSoundRef} src="/sounds/win.mp3" preload="auto"></audio>
+     <audio ref={loseSoundRef} src="/sounds/lose.mp3" preload="auto"></audio>
+     <audio ref={turnSoundRef} src="/sounds/turn.mp3" preload="auto"></audio>
+     
+     {/* Restaurar la visualización de alertas de puntos */}
+     {showAlert && (
+       <div className={`points-alert ${alertType}`}>
+         {alertMessage}
+       </div>
+     )}
+     
+     <div className="game-info">
+       <div className="game-header">
+         <h2>Jugador: {user?.username}</h2>
+         <button className="logout-button" onClick={handleLogout}>
+           Cerrar Sesión
+         </button>
+       </div>
+       
+       {isConnected ? (
+         <div className="connection-status connected">Conectado al servidor</div>
+       ) : (
+         <div className="connection-status disconnected">Desconectado del servidor</div>
+       )}
+     </div>
 
-      {/* Mesa y turno en la parte superior */}
-      <div className="game-status-bar">
-        <div className="table-info">
-          Mesa {currentTableNumber}
-        </div>
-        <div className={`turn-status ${isYourTurn ? 'your-turn-indicator' : 'wait-turn-indicator'}`}>
-          {isYourTurn ? "Tu turno" : "Espere su turno"}
-        </div>
-      </div>
+     {/* Mesa y turno en la parte superior */}
+     <div className="game-status-bar">
+       <div className="table-info">
+         Mesa {currentTableNumber}
+       </div>
+       <div className={`turn-status ${isYourTurn ? 'your-turn-indicator' : 'wait-turn-indicator'}`}>
+         {isYourTurn ? "Tu turno" : "Espere su turno"}
+       </div>
+     </div>
 
-      {/* Puntaje después de mesa y turno */}
-      <div className="game-score">
-        Puntaje: {localScore}
-      </div>
+     {/* Puntaje después de mesa y turno */}
+     <div className="game-score">
+       Puntaje: {localScore}
+     </div>
 
-      {/* Contador de tiempo antes del tablero */}
-      <div className="time-display">
-        Tiempo: <span className={`timer-value ${timeLeft === 0 ? 'time-up' : ''}`}>{timeLeft}</span> segundos
-      </div>
+     {/* Contador de tiempo antes del tablero - CORREGIDO */}
+     <div className="time-display">
+       Tiempo: <span className={`timer-value ${timeLeft === 0 ? 'time-up' : ''}`}>{timeLeft}</span> segundos
+     </div>
 
-      {/* Mensajes de bloqueo */}
-      {isScoreLocked && (
-        <div className="score-lock-banner">
-          Tu cuenta está bloqueada por alcanzar 23000 puntos. Contacta al administrador.
-        </div>
-      )}
+     {/* Mensajes de bloqueo */}
+     {isScoreLocked && (
+       <div className="score-lock-banner">
+         Tu cuenta está bloqueada por alcanzar 23000 puntos. Contacta al administrador.
+       </div>
+     )}
 
-      {user?.isBlocked && (
-        <div className="score-lock-banner">
-          Tu cuenta está bloqueada por el administrador. Puedes ver el juego pero no jugar.
-        </div>
-      )}
+     {user?.isBlocked && (
+       <div className="score-lock-banner">
+         Tu cuenta está bloqueada por el administrador. Puedes ver el juego pero no jugar.
+       </div>
+     )}
 
-      {user?.isAdmin && (
-        <div className="admin-info-banner">
-          Modo administrador: Solo puedes observar el juego.
-        </div>
-      )}
+     {user?.isAdmin && (
+       <div className="admin-info-banner">
+         Modo administrador: Solo puedes observar el juego.
+       </div>
+     )}
 
-      {message && <div className="message">{message}</div>}
+     {message && <div className="message">{message}</div>}
 
-      {/* Tablero de juego */}
-      <div className="game-board">
-        {memoizedBoard}
-      </div>
+     {/* Tablero de juego */}
+     <div className="game-board">
+       {memoizedBoard}
+     </div>
 
-      {/* Jugador actual */}
-      {currentPlayer && (
-        <div className="current-player">
-          Jugador actual: <span className="current-player-name">{currentPlayer.username}</span>
-        </div>
-      )}
-      
-      {/* Lista de jugadores conectados */}
-      <div className="players-section">
-        <h3>Jugadores conectados</h3>
-        <PlayerList players={players} currentPlayerId={currentPlayer?.id} />
-      </div>
-      
-      {showAdminModal && (
-        <AdminButton 
-          onClose={() => setShowAdminModal(false)} 
-          socket={socket}
-        />
-      )}
-    </div>
-  </>
-  );
+     {/* Jugador actual */}
+     {currentPlayer && (
+       <div className="current-player">
+         Jugador actual: <span className="current-player-name">{currentPlayer.username}</span>
+       </div>
+     )}
+     
+     {/* Lista de jugadores conectados */}
+     <div className="players-section">
+       <h3>Jugadores conectados</h3>
+       <PlayerList players={players} currentPlayerId={currentPlayer?.id} />
+     </div>
+     
+     {showAdminModal && (
+       <AdminButton 
+         onClose={() => setShowAdminModal(false)} 
+         socket={socket}
+       />
+     )}
+   </div>
+ </>
+ );
 }
