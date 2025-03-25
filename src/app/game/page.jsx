@@ -112,24 +112,9 @@ export default function Game() {
   const prevScoreRef = useRef();
 
   // Función segura para reproducir sonidos (desactivada)
-  const playSoundSafely = (audioRef, volume = 1.0) => {
-    if (!soundsEnabled) return; // No hacer nada si los sonidos están desactivados
-    
-    try {
-      if (audioRef && audioRef.current) {
-        audioRef.current.volume = volume;
-        audioRef.current.currentTime = 0;
-        
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.log('Error reproduciendo sonido (ignorado):', error);
-          });
-        }
-      }
-    } catch (error) {
-      console.log('Error capturado al reproducir sonido:', error);
-    }
+  const playSoundSafely = () => {
+    // Función vacía que no hace nada
+    return;
   };
 
   // Función para cerrar sesión y guardar el estado actual
@@ -158,12 +143,7 @@ export default function Game() {
       : `¡Perdiste ${Math.abs(points)} puntos!`);
     setShowAlert(true);
     
-    // Reproducir el sonido correspondiente (desactivado)
-    if (isPositive) {
-      playSoundSafely(winSoundRef);
-    } else {
-      playSoundSafely(loseSoundRef);
-    }
+    // Eliminar referencias a sonidos aquí
     
     setTimeout(() => {
       setShowAlert(false);
@@ -658,11 +638,15 @@ export default function Game() {
 
   // Efecto para limpiar la marca de última ficha seleccionada
   useEffect(() => {
-    if (lastSelectedTile) {
+    if (lastSelectedTile && lastSelectedTile.index !== undefined && lastSelectedTile.index !== null) {
       const timer = setTimeout(() => {
         setBoard(prevBoard => {
+          if (!prevBoard || !Array.isArray(prevBoard)) return prevBoard;
+          
           const newBoard = [...prevBoard];
-          if (newBoard[lastSelectedTile.index] && newBoard[lastSelectedTile.index].lastSelected) {
+          if (newBoard[lastSelectedTile.index] && 
+              typeof newBoard[lastSelectedTile.index] === 'object' && 
+              newBoard[lastSelectedTile.index].lastSelected) {
             newBoard[lastSelectedTile.index] = {
               ...newBoard[lastSelectedTile.index],
               lastSelected: false
