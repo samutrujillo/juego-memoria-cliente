@@ -9,6 +9,9 @@ import AdminButton from '@/components/AdminButton';
 import '@/styles/GameBoard.css';
 import config from '@/config';
 
+// Flag para desactivar los sonidos temporalmente
+const soundsEnabled = false;
+
 let socket;
 
 // Componente para ocultar el logo programáticamente
@@ -100,7 +103,7 @@ export default function Game() {
   
   const router = useRouter();
   
-  // Referencias para los sonidos
+  // Referencias para los sonidos (mantenemos las referencias aunque no se usen)
   const winSoundRef = useRef(null);
   const loseSoundRef = useRef(null);
   const turnSoundRef = useRef(null);
@@ -108,41 +111,43 @@ export default function Game() {
   // Referencia para seguimiento de cambios en puntuación
   const prevScoreRef = useRef();
 
-  // Modificar la función playSoundSafely para manejar mejor los errores
-const playSoundSafely = (audioRef, volume = 1.0) => {
-  try {
-    if (audioRef && audioRef.current) {
-      audioRef.current.volume = volume;
-      audioRef.current.currentTime = 0;
-      
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.log('Error reproduciendo sonido (ignorado):', error);
-        });
+  // Función segura para reproducir sonidos (desactivada)
+  const playSoundSafely = (audioRef, volume = 1.0) => {
+    if (!soundsEnabled) return; // No hacer nada si los sonidos están desactivados
+    
+    try {
+      if (audioRef && audioRef.current) {
+        audioRef.current.volume = volume;
+        audioRef.current.currentTime = 0;
+        
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.log('Error reproduciendo sonido (ignorado):', error);
+          });
+        }
       }
+    } catch (error) {
+      console.log('Error capturado al reproducir sonido:', error);
     }
-  } catch (error) {
-    console.log('Error capturado al reproducir sonido:', error);
-  }
-};
+  };
 
-// Añadir en la función handleLogout
-const handleLogout = () => {
-  try {
-    if (socket) {
-      socket.emit('saveGameState', { userId: user?.id });
-      socket.disconnect();
+  // Función para cerrar sesión y guardar el estado actual
+  const handleLogout = () => {
+    try {
+      if (socket) {
+        socket.emit('saveGameState', { userId: user?.id });
+        socket.disconnect();
+      }
+      sessionStorage.removeItem('user');
+      router.push('/');
+    } catch (error) {
+      console.log('Error durante el cierre de sesión:', error);
+      // Intentar redirigir a la página de inicio de todos modos
+      sessionStorage.removeItem('user');
+      router.push('/');
     }
-    sessionStorage.removeItem('user');
-    router.push('/');
-  } catch (error) {
-    console.log('Error durante el cierre de sesión:', error);
-    // Intentar redirigir a la página de inicio de todos modos
-    sessionStorage.removeItem('user');
-    router.push('/');
-  }
-};
+  };
 
   // Función para mostrar la alerta (restaurada)
   const showPointsAlert = (points) => {
@@ -153,7 +158,7 @@ const handleLogout = () => {
       : `¡Perdiste ${Math.abs(points)} puntos!`);
     setShowAlert(true);
     
-    // Reproducir el sonido correspondiente
+    // Reproducir el sonido correspondiente (desactivado)
     if (isPositive) {
       playSoundSafely(winSoundRef);
     } else {
@@ -897,9 +902,14 @@ const handleLogout = () => {
     )}
   
     <div className="game-container game-page">
-      <audio ref={winSoundRef} src="/sounds/win.mp3" preload="auto"></audio>
-      <audio ref={loseSoundRef} src="/sounds/lose.mp3" preload="auto"></audio>
-      <audio ref={turnSoundRef} src="/sounds/turn.mp3" preload="auto"></audio>
+      {/* Referencias a audio desactivadas para evitar errores */}
+      {soundsEnabled && (
+        <>
+          <audio ref={winSoundRef} src="/sounds/win.mp3" preload="auto"></audio>
+          <audio ref={loseSoundRef} src="/sounds/lose.mp3" preload="auto"></audio>
+          <audio ref={turnSoundRef} src="/sounds/turn.mp3" preload="auto"></audio>
+        </>
+      )}
       
       {/* Mostrar alertas solo para el jugador actual */}
       {showAlert && (
