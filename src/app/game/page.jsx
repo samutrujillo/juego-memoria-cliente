@@ -108,27 +108,24 @@ export default function Game() {
   // Referencia para seguimiento de cambios en puntuación
   const prevScoreRef = useRef();
 
-  // Función segura para reproducir sonidos (ignora errores)
-  const playSoundSafely = (audioRef, volume = 1.0, forcePlay = false) => {
-    if (audioRef && audioRef.current) {
-      // Si no es el jugador actual y forcePlay es false, no reproducir
-      if (!forcePlay) {
+  // Función segura para reproducir sonidos (modificada para solo reproducir sus propios sonidos)
+  const playSoundSafely = (audioRef, volume = 1.0, playerId = null) => {
+    // Solo reproducir si es el jugador actual o si no se especifica un playerId
+    if (!playerId || playerId === user?.id) {
+      if (audioRef && audioRef.current) {
         audioRef.current.volume = volume;
-      } else {
-        // Volumen muy bajo para sonidos de otros jugadores
-        audioRef.current.volume = 0.05;
-      }
-      
-      // Reseteamos la reproducción
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      
-      // Usar Promise.catch para manejar errores silenciosamente
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.log('Error reproduciendo sonido (ignorado):', error);
-        });
+        
+        // Reseteamos la reproducción
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        
+        // Usar Promise.catch para manejar errores silenciosamente
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.log('Error reproduciendo sonido (ignorado):', error);
+          });
+        }
       }
     }
   };
@@ -152,7 +149,7 @@ export default function Game() {
       : `¡Perdiste ${Math.abs(points)} puntos!`);
     setShowAlert(true);
     
-    // Reproducir el sonido correspondiente
+    // Reproducir el sonido correspondiente - Solo para el jugador actual
     if (isPositive) {
       playSoundSafely(winSoundRef);
     } else {
@@ -418,37 +415,92 @@ export default function Game() {
         setRowSelections([0, 0, 0, 0]);
       });
 
+      // Nuevo manejador para reinicio completo del juego
+      socket.on('gameCompletelyReset', ({ message, newBoard, status }) => {
+        console.log("Juego completamente reiniciado");
+        // Reiniciar el tablero local
+        setBoard(newBoard || generateLocalBoard());
+        setGameStatus(status || 'playing');
+        setRowSelections([0, 0, 0, 0]);
+        setCanSelectTiles(true);
+        setMessage(message);
+        
+        // Forzar recarga de estado
+        socket.emit('syncGameState', { userId: parsedUser.id });
+      });
+
+      // Nuevo manejador para actualización forzada del estado del juego
+      socket.on('forceGameStateRefresh', (gameState) => {
+        console.log("Forzando actualización de estado del juego");
+        
+        // Verificar que el estado contenga información válida
+        if (gameState && gameState.board && Array.isArray(gameState.board)) {
+          setBoard(gameState.board);
+          setCurrentPlayer(gameState.currentPlayer);
+          setPlayers(gameState.players || []);
+          setGameStatus(gameState.status || 'playing');
+          
+          // Reiniciar variables críticas
+          setCanSelectTiles(true);
+          if (players.length <= 1) {
+            setIsYourTurn(true);
+          }
+        } else {
+          console.error("forceGameStateRefresh recibió datos incompletos:", gameState);
+          // En caso de datos inválidos, generar un nuevo tablero local
+          setBoard(generateLocalBoard());
+        }
+      });
+
       socket.on('gameState', (gameState) => {
-        if (gameState.players && gameState.players.length <= 1) {
-          gameState.status = 'playing';
+        // Validar que gameState y sus propiedades existan
+        if (!gameState) {
+          console.error("gameState recibido es undefined o null");
+          return;
         }
         
-        // Mantener el estado actual del tablero sin reiniciar
-        setBoard(prev => {
-          const updatedBoard = [...prev];
-          // Solo actualizar las fichas que están reveladas en el estado del juego
-          for (let i = 0; i < Math.min(updatedBoard.length, gameState.board.length); i++) {
-            if (gameState.board[i].revealed) {
-              updatedBoard[i] = {
-                ...updatedBoard[i],
-                revealed: true,
-                selectedBy: gameState.board[i].selectedBy,
-                value: gameState.board[i].value || updatedBoard[i].value
-              };
+        // Establecer jugadores a un array vacío si no existe
+        const gamePlayers = gameState.players || [];
+        
+        if (gamePlayers.length <= 1) {
+          gameState.status = 'playing';
+        }
+
+        // Solo actualizar el tablero si existe gameState.board y es un array
+        if (gameState.board && Array.isArray(gameState.board)) {
+          setBoard(prev => {
+            // Verificar que prev sea un array válido
+            if (!Array.isArray(prev) || prev.length === 0) {
+              return gameState.board;
             }
-          }
-          return updatedBoard;
-        });
+            
+            const updatedBoard = [...prev];
+            // Solo actualizar las fichas que están reveladas en el estado del juego
+            for (let i = 0; i < Math.min(updatedBoard.length, gameState.board.length); i++) {
+              if (gameState.board[i] && gameState.board[i].revealed) {
+                updatedBoard[i] = {
+                  ...updatedBoard[i],
+                  revealed: true,
+                  selectedBy: gameState.board[i].selectedBy,
+                  value: gameState.board[i].value || updatedBoard[i].value
+                };
+              }
+            }
+            return updatedBoard;
+          });
+        } else {
+          console.warn("gameState.board no es válido:", gameState.board);
+        }
         
         // Verificar si ha cambiado el jugador actual
         const prevPlayerId = currentPlayer?.id;
         const newPlayerId = gameState.currentPlayer?.id;
         
         setCurrentPlayer(gameState.currentPlayer);
-        setPlayers(gameState.players || []);
+        setPlayers(gamePlayers);
         setGameStatus(gameState.status || 'playing');
         
-        const isCurrentUserTurn = (gameState.players && gameState.players.length <= 1) || 
+        const isCurrentUserTurn = (gamePlayers.length <= 1) || 
           (gameState.currentPlayer && gameState.currentPlayer.id === parsedUser.id);
         
         setIsYourTurn(isCurrentUserTurn);
@@ -489,6 +541,11 @@ export default function Game() {
       socket.on('tileSelected', ({ tileIndex, tileValue, playerId, newScore, rowSelections, soundType, playerUsername, timestamp, isRevealed }) => {
         // Actualizar el tablero para todos los jugadores
         setBoard(prevBoard => {
+          // Verificar que prevBoard sea un array válido
+          if (!Array.isArray(prevBoard) || prevBoard.length === 0) {
+            return prevBoard;
+          }
+          
           const newBoard = [...prevBoard];
           if (newBoard[tileIndex]) {
             newBoard[tileIndex] = { 
@@ -513,18 +570,17 @@ export default function Game() {
         // Determinar si es el jugador actual
         const isCurrentPlayer = playerId === parsedUser.id;
         
-        // Determinar el tipo de sonido basado en el valor real
-        const isPositiveValue = tileValue > 0;
-        if (isPositiveValue) {
-          // Solo reproducir a volumen normal si es el jugador actual, o a volumen muy bajo si es otro
-          playSoundSafely(winSoundRef, isCurrentPlayer ? 1.0 : 0, !isCurrentPlayer);
-        } else {
-          playSoundSafely(loseSoundRef, isCurrentPlayer ? 1.0 : 0, !isCurrentPlayer);
-        }
-        
-        // Mostrar alerta y actualizar puntaje solo para el jugador actual
+        // Solo reproducir sonidos si es el jugador actual
         if (isCurrentPlayer) {
-          // Usar el valor que viene del servidor
+          // Determinar el tipo de sonido basado en el valor real
+          const isPositiveValue = tileValue > 0;
+          if (isPositiveValue) {
+            playSoundSafely(winSoundRef, 1.0);
+          } else {
+            playSoundSafely(loseSoundRef, 1.0);
+          }
+          
+          // Mostrar alerta y actualizar puntaje solo para el jugador actual
           showPointsAlert(tileValue);
           updateLocalScore(newScore);
         }
@@ -599,6 +655,8 @@ export default function Game() {
           socket.off('scoreLimitReached');
           socket.off('userUnlocked');
           socket.off('blockStatusChanged');
+          socket.off('gameCompletelyReset');
+          socket.off('forceGameStateRefresh');
           socket.emit('saveGameState', { userId: user?.id }); // Guardar estado al salir
           socket.emit('leaveGame');
           socket.disconnect();
@@ -610,28 +668,37 @@ export default function Game() {
     }
   }, [router]);
 
-  // Efecto para el temporizador
+  // Efecto para el temporizador optimizado
   useEffect(() => {
     let timer;
     
     if (isYourTurn) {
-      setTimeLeft(6); // Cambiado a 6 segundos
+      // Iniciar siempre con 6 segundos exactos
+      setTimeLeft(6);
       setCanSelectTiles(true);
       
-      // Reproducir sonido de turno
-      if (turnSoundRef && turnSoundRef.current) {
-        turnSoundRef.current.currentTime = 0;
-        turnSoundRef.current.play().catch(e => console.log('Error reproduciendo sonido de turno:', e));
-      }
+      // Reproducir sonido de turno solo para el jugador actual
+      playSoundSafely(turnSoundRef);
+      
+      // Asegurar que el intervalo sea exactamente de 1 segundo
+      let previousTime = Date.now();
       
       timer = setInterval(() => {
+        const currentTime = Date.now();
+        // Ajustar el intervalo si es necesario
+        const drift = currentTime - previousTime - 1000;
+        previousTime = currentTime;
+        
         setTimeLeft((prevTime) => {
-          if (prevTime <= 1) {
+          const newTime = prevTime - 1;
+          console.log(`Temporizador: ${newTime} segundos (drift: ${drift}ms)`);
+          
+          if (newTime <= 0) {
             clearInterval(timer);
             setCanSelectTiles(false);
             return 0;
           }
-          return prevTime - 1;
+          return newTime;
         });
       }, 1000);
     } else {
@@ -712,7 +779,33 @@ export default function Game() {
       return;
     }
     
-    if (board[index]?.revealed) {
+    // Validar que haya un tablero válido
+    if (!Array.isArray(board) || board.length === 0) {
+      console.error("El tablero no es válido");
+      setMessage("Error: El tablero no es válido. Recargando...");
+      // Solicitar sincronización de estado para obtener un tablero válido
+      if (socket && socket.connected) {
+        socket.emit('syncGameState', { userId: user.id });
+      }
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+    
+    // Validar que el índice sea válido
+    if (index < 0 || index >= board.length) {
+      console.error(`Índice de ficha inválido: ${index}`);
+      return;
+    }
+    
+    // Validar que la ficha existe en el tablero
+    if (!board[index]) {
+      console.error(`La ficha en el índice ${index} no existe`);
+      return;
+    }
+    
+    // Verificar si ya está revelada
+    if (board[index].revealed) {
+      console.log("Esta ficha ya está revelada");
       return;
     }
     
@@ -763,9 +856,6 @@ export default function Game() {
         
         return newScore;
       });
-      
-      // Determinar el tipo de sonido basado en el valor real
-      const isPositiveValue = tileValue > 0;
       
       // Actualizar el tablero localmente para feedback inmediato
       setBoard(prevBoard => {
