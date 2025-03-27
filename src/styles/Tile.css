@@ -98,13 +98,6 @@
   transform-origin: center;
 }
 
-.arrow-icon.up {
-  transform: rotate(0deg);
-}
-
-.arrow-icon.down {
-  transform: rotate(180deg);
-}
 
 /* Clases para los iconos de las fichas */
 .tile-icon {
