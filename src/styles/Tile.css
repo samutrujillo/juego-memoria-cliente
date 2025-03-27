@@ -45,13 +45,13 @@
   box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
 }
 
-/* Cambiar color de fichas reveladas a gris */
+/* Cambiar color de fichas reveladas para que coincidan con el fondo del tablero */
 .tile.revealed {
-  background-color: #888888;
+  background-color: #3b2063;
 }
 
 .tile.revealed.winner, .tile.revealed.loser {
-  background-color: #888888;
+  background-color: #3b2063;
 }
 
 .tile.disabled {
@@ -76,6 +76,13 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Nueva clase para destacar cuando el jugador actual seleccionó la ficha */
+.selected-by-label.my-selection {
+  color: white;
+  background-color: rgba(0, 128, 0, 0.7); /* Verde semitransparente */
+  font-weight: bold;
 }
 
 /* Asegurar que los toques funcionen correctamente */

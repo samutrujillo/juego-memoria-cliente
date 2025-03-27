@@ -236,6 +236,29 @@
   font-size: 1rem;
 }
 
+/* Nuevo: Footer para el botón de cerrar modal */
+.admin-modal-footer {
+  padding: 15px;
+  text-align: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 20px;
+}
+
+.close-modal-btn {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+
+.close-modal-btn:hover {
+  background-color: #d32f2f;
+}
+
 /* Media queries para responsividad */
 @media (min-width: 768px) {
   .admin-player-item {

@@ -364,6 +364,27 @@
   background-color: #2980b9;
 }
 
+/* Estilo para el botón de admin panel */
+.admin-panel-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: #ff4081;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-weight: bold;
+  z-index: 10000;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  border: none;
+  font-size: 14px;
+}
+
+.admin-panel-button:hover {
+  background-color: #f50057;
+}
+
 @keyframes fadeInOut {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
   15% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -412,6 +433,20 @@
     padding: 10px 20px;
     font-size: 1.2rem;
     max-width: 90%;
+  }
+  
+  /* Ajustar posición del botón admin para tablets */
+  .admin-panel-button {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  
+  .game-header {
+    position: relative;
+    margin-top: 40px; /* Espacio para el botón de admin */
   }
 }
 
@@ -479,6 +514,20 @@
     padding: 8px;
   }
   
+  /* Ajustar posición del botón admin para móviles pequeños */
+  .admin-panel-button {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+  
+  .game-header {
+    position: relative;
+    margin-top: 35px; /* Espacio para el botón de admin */
+  }
+  
   /* Ajustar tamaño de alerta para dispositivos móviles */
   .points-alert {
     padding: 8px 15px;
@@ -544,5 +593,15 @@
     max-width: 85%;
     top: 15%;
     border-width: 1px;
+  }
+  
+  /* Ajustar posición del botón admin para móviles muy pequeños */
+  .admin-panel-button {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+  
+  .game-header {
+    margin-top: 30px; /* Espacio para el botón de admin */
   }
 }

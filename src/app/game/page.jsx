@@ -72,7 +72,7 @@ export default function Game() {
   const [score, setScore] = useState(60000);
   const [localScore, setLocalScore] = useState(60000);
   const [message, setMessage] = useState('');
-  const [timeLeft, setTimeLeft] = useState(4);
+  const [timeLeft, setTimeLeft] = useState(6); // Cambiado de 4 a 6 segundos
   const [gameStatus, setGameStatus] = useState('playing');
   const [user, setUser] = useState(null);
   const [rowSelections, setRowSelections] = useState([0, 0, 0, 0]);
@@ -103,6 +103,7 @@ export default function Game() {
   // Referencias para los sonidos
   const winSoundRef = useRef(null);
   const loseSoundRef = useRef(null);
+  const turnSoundRef = useRef(null); // Nuevo para sonido de turno
   
   // Referencia para seguimiento de cambios en puntuación
   const prevScoreRef = useRef();
@@ -453,7 +454,7 @@ export default function Game() {
         setIsYourTurn(isCurrentUserTurn);
         
         if (isCurrentUserTurn) {
-          setTimeLeft(4);
+          setTimeLeft(6); // Cambiado a 6 segundos
           setCanSelectTiles(true);
         }
         
@@ -614,8 +615,14 @@ export default function Game() {
     let timer;
     
     if (isYourTurn) {
-      setTimeLeft(4);
+      setTimeLeft(6); // Cambiado a 6 segundos
       setCanSelectTiles(true);
+      
+      // Reproducir sonido de turno
+      if (turnSoundRef && turnSoundRef.current) {
+        turnSoundRef.current.currentTime = 0;
+        turnSoundRef.current.play().catch(e => console.log('Error reproduciendo sonido de turno:', e));
+      }
       
       timer = setInterval(() => {
         setTimeLeft((prevTime) => {
@@ -823,6 +830,7 @@ export default function Game() {
           }
           lastSelected={lastSelectedTile?.index === index}
           selectedBy={tile?.selectedBy}
+          currentUsername={user?.username} // Añadido para resaltar fichas del jugador actual
         />
       ))
     ) : (
@@ -853,21 +861,7 @@ export default function Game() {
       
       {(user?.isAdmin || user?.username?.toLowerCase() === "admin") && (
         <button 
-          style={{
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            backgroundColor: '#ff4081',
-            color: 'white',
-            padding: '10px 20px',
-            borderRadius: '4px',
-            fontWeight: 'bold',
-            zIndex: 10000,
-            cursor: 'pointer',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
-            border: 'none',
-            fontSize: '14px'
-          }}
+          className="admin-panel-button"
           onClick={handleAdminPanel}
         >
           Panel de Admin
@@ -877,6 +871,7 @@ export default function Game() {
       <div className="game-container game-page">
         <audio ref={winSoundRef} src="/sounds/win.mp3" preload="auto"></audio>
         <audio ref={loseSoundRef} src="/sounds/lose.mp3" preload="auto"></audio>
+        <audio ref={turnSoundRef} src="/sounds/turno.mp3" preload="auto"></audio>
         
         {/* Restaurar las alertas de puntos, pero solo para el jugador actual */}
         {showAlert && (

@@ -251,6 +251,13 @@ const AdminModal = ({ onClose, socket }) => {
             </button>
           </div>
         </div>
+        
+        {/* Botón para cerrar el modal en la parte inferior */}
+        <div className="admin-modal-footer">
+          <button onClick={onClose} className="close-modal-btn">
+            Cerrar Panel
+          </button>
+        </div>
       </div>
     </div>
   );
