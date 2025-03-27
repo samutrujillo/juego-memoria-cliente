@@ -842,48 +842,49 @@ export default function Game() {
   }, [router]);
 
   // Efecto para el temporizador optimizado
-  useEffect(() => {
-    let timer;
+useEffect(() => {
+  let timer;
+  
+  if (isYourTurn) {
+    // Iniciar siempre con 6 segundos exactos
+    setTimeLeft(6);
+    setCanSelectTiles(true);
     
-    if (isYourTurn) {
-      // Iniciar siempre con 6 segundos exactos
-      setTimeLeft(6);
-      setCanSelectTiles(true);
+    // Reproducir sonido de turno siempre que sea tu turno
+    // (ya sea único jugador o multijugador)
+    playSoundSafely(turnSoundRef);
+    
+    // Asegurar que el intervalo sea exactamente de 1 segundo
+    let previousTime = Date.now();
+    
+    timer = setInterval(() => {
+      const currentTime = Date.now();
+      // Ajustar el intervalo si es necesario
+      const drift = currentTime - previousTime - 1000;
+      previousTime = currentTime;
       
-      // Reproducir sonido de turno solo para el jugador actual
-      playSoundSafely(turnSoundRef);
-      
-      // Asegurar que el intervalo sea exactamente de 1 segundo
-      let previousTime = Date.now();
-      
-      timer = setInterval(() => {
-        const currentTime = Date.now();
-        // Ajustar el intervalo si es necesario
-        const drift = currentTime - previousTime - 1000;
-        previousTime = currentTime;
+      setTimeLeft((prevTime) => {
+        const newTime = prevTime - 1;
+        console.log(`Temporizador: ${newTime} segundos (drift: ${drift}ms)`);
         
-        setTimeLeft((prevTime) => {
-          const newTime = prevTime - 1;
-          console.log(`Temporizador: ${newTime} segundos (drift: ${drift}ms)`);
-          
-          if (newTime <= 0) {
-            clearInterval(timer);
-            setCanSelectTiles(false);
-            return 0;
-          }
-          return newTime;
-        });
-      }, 1000);
-    } else {
+        if (newTime <= 0) {
+          clearInterval(timer);
+          setCanSelectTiles(false);
+          return 0;
+        }
+        return newTime;
+      });
+    }, 1000);
+  } else {
+    clearInterval(timer);
+  }
+  
+  return () => {
+    if (timer) {
       clearInterval(timer);
     }
-    
-    return () => {
-      if (timer) {
-        clearInterval(timer);
-      }
-    };
-  }, [isYourTurn]);
+  };
+}, [isYourTurn]);
 
   // Efecto para limpiar la marca de última ficha seleccionada
   useEffect(() => {
