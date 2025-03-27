@@ -48,7 +48,7 @@ const Tile = ({ index, revealed, value, onClick, disabled, lastSelected, selecte
       <img 
         src="/images/logo.png" 
         alt={value > 0 ? "+15K" : "-15K"} 
-        className={`arrow-icon ${value > 0 ? 'up' : 'down'}`}
+        className="arrow-icon"
       />
     );
   };
