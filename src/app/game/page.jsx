@@ -287,6 +287,37 @@ export default function Game() {
         socket.emit('joinGame');
       });
 
+      // Nuevo evento para actualizar el estado de conexión de los jugadores
+      socket.on('connectionStatusUpdate', ({ players }) => {
+        if (Array.isArray(players)) {
+          setPlayers(prevPlayers => {
+            // Crear una copia para modificar
+            const updatedPlayers = [...prevPlayers];
+            
+            // Actualizar el estado de conexión de cada jugador
+            players.forEach(playerUpdate => {
+              const index = updatedPlayers.findIndex(p => p.id === playerUpdate.id);
+              if (index !== -1) {
+                updatedPlayers[index] = {
+                  ...updatedPlayers[index],
+                  isConnected: playerUpdate.isConnected
+                };
+              }
+            });
+            
+            return updatedPlayers;
+          });
+          
+          // Si solo hay un jugador conectado y soy yo, darme el turno
+          const connectedPlayers = players.filter(p => p.isConnected);
+          if (connectedPlayers.length === 1 && connectedPlayers[0].id === parsedUser.id) {
+            setIsYourTurn(true);
+            setTimeLeft(6);
+            setCanSelectTiles(true);
+          }
+        }
+      });
+
       // Añadir manejo para el evento de límite de puntaje
       socket.on('scoreLimitReached', ({ message }) => {
         setIsScoreLocked(true);
@@ -388,7 +419,7 @@ export default function Game() {
       });
 
       // Actualizar el manejo del evento boardReset
-      socket.on('boardReset', ({ message, newTableNumber, newBoard }) => {
+      socket.on('boardReset', ({ message, newTableNumber, newBoard, connectedPlayers }) => {
         setMessage(message);
         setTimeout(() => setMessage(''), 3000);
         
@@ -413,23 +444,134 @@ export default function Game() {
         
         // Reiniciar selecciones por hilera
         setRowSelections([0, 0, 0, 0]);
+        
+        // Actualizar el estado de conexión de los jugadores en la lista local
+        if (connectedPlayers && Array.isArray(connectedPlayers)) {
+          setPlayers(prevPlayers => 
+            prevPlayers.map(player => ({
+              ...player,
+              isConnected: connectedPlayers.includes(player.id)
+            }))
+          );
+        }
+        
+        // Si solo hay un jugador conectado y soy yo, darme el turno directamente
+        if (connectedPlayers && connectedPlayers.length === 1 && connectedPlayers[0] === parsedUser.id) {
+          setIsYourTurn(true);
+          setTimeLeft(6);
+          setCanSelectTiles(true);
+        }
       });
 
-      // Nuevo manejador para reinicio completo del juego
-      socket.on('gameCompletelyReset', ({ message, newBoard, status }) => {
+      // Nuevo evento para solicitud de sincronización forzada
+      socket.on('forceSyncRequest', ({ userId }) => {
+        console.log("Recibida solicitud de sincronización forzada");
+        
+        // Asegurarse de que es para nuestro usuario
+        if (userId === parsedUser.id) {
+          // Limpiar estados locales del juego
+          setRowSelections([0, 0, 0, 0]);
+          setCanSelectTiles(true);
+          setIsScoreLocked(false);
+          
+          // Generar nuevo tablero local fresco
+          const newBoard = generateLocalBoard();
+          setBoard(newBoard);
+          
+          // Solicitar sincronización completa con el servidor
+          socket.emit('syncGameState', { userId: parsedUser.id });
+        }
+      });
+
+      // Evento para mensaje de reinicio
+      socket.on('gameResetMessage', ({ message, command }) => {
+        setMessage(message);
+        
+        if (command === "resetComplete") {
+          // Restablecer estados locales críticos
+          setCanSelectTiles(true);
+          setRowSelections([0, 0, 0, 0]);
+          setLocalScore(60000);
+          setScore(60000);
+          setIsScoreLocked(false);
+          
+          // Actualizar en sessionStorage
+          try {
+            const userData = sessionStorage.getItem('user');
+            if (userData) {
+              const userObj = JSON.parse(userData);
+              userObj.score = 60000;
+              userObj.isBlocked = false;
+              userObj.isLockedDueToScore = false;
+              sessionStorage.setItem('user', JSON.stringify(userObj));
+            }
+          } catch (error) {
+            console.error('Error actualizando sessionStorage:', error);
+          }
+        }
+        
+        setTimeout(() => setMessage(''), 5000);
+      });
+
+      // Actualizar el manejador del evento gameCompletelyReset
+      socket.on('gameCompletelyReset', ({ message, newBoard, status, players }) => {
         console.log("Juego completamente reiniciado");
-        // Reiniciar el tablero local
+        
         setBoard(newBoard || generateLocalBoard());
         setGameStatus(status || 'playing');
         setRowSelections([0, 0, 0, 0]);
         setCanSelectTiles(true);
         setMessage(message);
         
-        // Forzar recarga de estado
-        socket.emit('syncGameState', { userId: parsedUser.id });
+        // Actualizar el estado de conexión de los jugadores
+        if (Array.isArray(players)) {
+          setPlayers(prevPlayers => {
+            const updatedPlayers = [...prevPlayers];
+            
+            // Actualizar el estado de conexión según la información recibida
+            players.forEach(playerUpdate => {
+              const index = updatedPlayers.findIndex(p => p.id === playerUpdate.id);
+              if (index !== -1) {
+                updatedPlayers[index] = {
+                  ...updatedPlayers[index],
+                  isConnected: playerUpdate.isConnected
+                };
+              }
+            });
+            
+            return updatedPlayers;
+          });
+        }
+        
+        // Establecer turno para jugador único
+        if (players && players.filter(p => p.isConnected).length <= 1) {
+          setIsYourTurn(true);
+          setTimeLeft(6);
+        } else if (currentPlayer && currentPlayer.id === parsedUser.id) {
+          setIsYourTurn(true);
+          setTimeLeft(6);
+        }
+        
+        // Actualizar información visual
+        setIsScoreLocked(false);
+        setUser(prev => ({ ...prev, isBlocked: false, isLockedDueToScore: false }));
+        
+        // Actualizar en sessionStorage
+        try {
+          const userData = sessionStorage.getItem('user');
+          if (userData) {
+            const userObj = JSON.parse(userData);
+            userObj.isBlocked = false;
+            userObj.isLockedDueToScore = false;
+            userObj.score = 60000;
+            sessionStorage.setItem('user', JSON.stringify(userObj));
+          }
+        } catch (error) {
+          console.error('Error actualizando sessionStorage:', error);
+        }
       });
 
-      // Nuevo manejador para actualización forzada del estado del juego
+      // Actualizar el manejador del evento forceGameStateRefresh
       socket.on('forceGameStateRefresh', (gameState) => {
         console.log("Forzando actualización de estado del juego");
         
@@ -440,15 +582,34 @@ export default function Game() {
           setPlayers(gameState.players || []);
           setGameStatus(gameState.status || 'playing');
           
-          // Reiniciar variables críticas
-          setCanSelectTiles(true);
-          if (players.length <= 1) {
-            setIsYourTurn(true);
+          // Reiniciar variables críticas y permitir explícitamente jugar
+          setCanSelectTiles(gameState.canSelectTiles !== undefined ? gameState.canSelectTiles : true);
+          
+          // Verificar si es mi turno
+          const isCurrentUserTurn = (gameState.players && gameState.players.length <= 1) || 
+            (gameState.currentPlayer && gameState.currentPlayer.id === parsedUser.id);
+          
+          setIsYourTurn(isCurrentUserTurn);
+          
+          if (isCurrentUserTurn) {
+            setTimeLeft(6);
+          }
+          
+          // Actualizar selecciones por hilera
+          if (gameState.rowSelections) {
+            setRowSelections(gameState.rowSelections);
           }
         } else {
           console.error("forceGameStateRefresh recibió datos incompletos:", gameState);
           // En caso de datos inválidos, generar un nuevo tablero local
           setBoard(generateLocalBoard());
+          setCanSelectTiles(true);
+          
+          // Si es el único jugador, darle el turno
+          if (players.length <= 1) {
+            setIsYourTurn(true);
+            setTimeLeft(6);
+          }
         }
       });
 
@@ -632,6 +793,14 @@ export default function Game() {
         setIsConnected(false);
       });
 
+      // Manejador para responder a pings del servidor (verificación de conexión)
+      socket.on('ping', (data, callback) => {
+        // Responder al ping para confirmar conexión
+        if (callback && typeof callback === 'function') {
+          callback({ status: 'active', userId: parsedUser.id });
+        }
+      });
+
       return () => {
         if (socket) {
           socket.off('connect');
@@ -657,6 +826,10 @@ export default function Game() {
           socket.off('blockStatusChanged');
           socket.off('gameCompletelyReset');
           socket.off('forceGameStateRefresh');
+          socket.off('forceSyncRequest');
+          socket.off('gameResetMessage');
+          socket.off('connectionStatusUpdate');
+          socket.off('ping');
           socket.emit('saveGameState', { userId: user?.id }); // Guardar estado al salir
           socket.emit('leaveGame');
           socket.disconnect();
