@@ -1226,7 +1226,7 @@ export default function Game() {
           />
         )}
 
-        <WhatsAppButton phoneNumber="573046306027" />
+        <WhatsAppButton phoneNumber="573016497697" />
       </div>
     </>
   );
