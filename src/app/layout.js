@@ -1,4 +1,5 @@
 import './globals.css';
+import WhatsAppButton from '@/components/WhatsAppButton';
 
 export const metadata = {
   title: 'FTAPP GAME',
@@ -14,6 +15,7 @@ export default function RootLayout({ children }) {
             <img src="/images/logo.png" alt="FTAPP GAME" className="logo-image" />
           </div>
           {children}
+          <WhatsAppButton phoneNumber="573016497697" />
         </div>
       </body>
     </html>
