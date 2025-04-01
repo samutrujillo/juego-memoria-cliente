@@ -517,63 +517,63 @@ export default function Game() {
         setTimeout(() => setMessage(''), 5000);
       });
 
-      // Actualizar el manejador del evento gameCompletelyReset
-      socket.on('gameCompletelyReset', ({ message, newBoard, status, players }) => {
-        console.log("Juego completamente reiniciado");
-        
-        setBoard(newBoard || generateLocalBoard());
-        setGameStatus(status || 'playing');
-        setRowSelections([0, 0, 0, 0]);
-        setCanSelectTiles(true);
-        setMessage(message);
-        
-        // Actualizar el estado de conexión de los jugadores
-        if (Array.isArray(players)) {
-          setPlayers(prevPlayers => {
-            const updatedPlayers = [...prevPlayers];
-            
-            // Actualizar el estado de conexión según la información recibida
-            players.forEach(playerUpdate => {
-              const index = updatedPlayers.findIndex(p => p.id === playerUpdate.id);
-              if (index !== -1) {
-                updatedPlayers[index] = {
-                  ...updatedPlayers[index],
-                  isConnected: playerUpdate.isConnected
-                };
-              }
-            });
-            
-            return updatedPlayers;
-          });
-        }
-        
-        // Establecer turno para jugador único
-        if (players && players.filter(p => p.isConnected).length <= 1) {
-          setIsYourTurn(true);
-          setTimeLeft(6);
-        } else if (currentPlayer && currentPlayer.id === parsedUser.id) {
-          setIsYourTurn(true);
-          setTimeLeft(6);
-        }
-        
-        // Actualizar información visual
-        setIsScoreLocked(false);
-        setUser(prev => ({ ...prev, isBlocked: false, isLockedDueToScore: false }));
-        
-        // Actualizar en sessionStorage
-        try {
-          const userData = sessionStorage.getItem('user');
-          if (userData) {
-            const userObj = JSON.parse(userData);
-            userObj.isBlocked = false;
-            userObj.isLockedDueToScore = false;
-            userObj.score = 60000;
-            sessionStorage.setItem('user', JSON.stringify(userObj));
-          }
-        } catch (error) {
-          console.error('Error actualizando sessionStorage:', error);
+      // En el componente Game, dentro de los event listeners de useEffect
+socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelections, playerSelections }) => {
+  console.log("Juego completamente reiniciado");
+  
+  setBoard(newBoard || generateLocalBoard());
+  setGameStatus(status || 'playing');
+  setRowSelections(rowSelections || [0, 0, 0, 0]); // Usar las selecciones recibidas o reiniciar
+  setCanSelectTiles(true);
+  setMessage(message);
+  
+  // Actualizar el estado de conexión de los jugadores
+  if (Array.isArray(players)) {
+    setPlayers(prevPlayers => {
+      const updatedPlayers = [...prevPlayers];
+      
+      // Actualizar el estado de conexión según la información recibida
+      players.forEach(playerUpdate => {
+        const index = updatedPlayers.findIndex(p => p.id === playerUpdate.id);
+        if (index !== -1) {
+          updatedPlayers[index] = {
+            ...updatedPlayers[index],
+            isConnected: playerUpdate.isConnected
+          };
         }
       });
+      
+      return updatedPlayers;
+    });
+  }
+  
+  // Establecer turno para jugador único
+  if (players && players.filter(p => p.isConnected).length <= 1) {
+    setIsYourTurn(true);
+    setTimeLeft(6);
+  } else if (currentPlayer && currentPlayer.id === user.id) {
+    setIsYourTurn(true);
+    setTimeLeft(6);
+  }
+  
+  // Actualizar información visual
+  setIsScoreLocked(false);
+  setUser(prev => ({ ...prev, isBlocked: false, isLockedDueToScore: false }));
+  
+  // Actualizar en sessionStorage
+  try {
+    const userData = sessionStorage.getItem('user');
+    if (userData) {
+      const userObj = JSON.parse(userData);
+      userObj.isBlocked = false;
+      userObj.isLockedDueToScore = false;
+      userObj.score = 60000;
+      sessionStorage.setItem('user', JSON.stringify(userObj));
+    }
+  } catch (error) {
+    console.error('Error actualizando sessionStorage:', error);
+  }
+});
 
       // Actualizar el manejador del evento forceGameStateRefresh
       socket.on('forceGameStateRefresh', (gameState) => {
