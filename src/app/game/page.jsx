@@ -7,6 +7,7 @@ import PlayerList from '@/components/PlayerList';
 import Tile from '@/components/Tile';
 import AdminButton from '@/components/AdminButton';
 import WhatsAppButton from '@/components/WhatsAppButton';
+import CoinRain from '@/components/CoinRain';
 import '@/styles/GameBoard.css';
 import config from '@/config';
 
@@ -20,7 +21,7 @@ const HideLogoEffect = () => {
     if (logoElement) {
       logoElement.style.display = 'none';
     }
-    
+
     // Restaurar visibilidad al desmontar (si es necesario)
     return () => {
       const logoElement = document.querySelector('.app-title');
@@ -29,7 +30,7 @@ const HideLogoEffect = () => {
       }
     };
   }, []);
-  
+
   return null;
 };
 
@@ -37,11 +38,11 @@ export default function Game() {
   // Función para generar un tablero local con distribución perfecta
   const generateLocalBoard = () => {
     const localBoard = [];
-    
+
     // Para cada hilera
     for (let row = 0; row < 4; row++) {
       const rowTiles = [];
-      
+
       // Crear 2 fichas ganadoras (+15000) y 2 perdedoras (-15000) para esta hilera
       for (let i = 0; i < 2; i++) {
         rowTiles.push({ value: 15000, revealed: false });  // Asegurarse que es positivo
@@ -49,20 +50,20 @@ export default function Game() {
       for (let i = 0; i < 2; i++) {
         rowTiles.push({ value: -15000, revealed: false }); // Asegurarse que es negativo
       }
-      
+
       // Mezclarlas
       for (let i = rowTiles.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [rowTiles[i], rowTiles[j]] = [rowTiles[j], rowTiles[i]];
       }
-      
+
       // Añadirlas al tablero
       localBoard.push(...rowTiles);
     }
-    
+
     // Validación adicional para verificar los valores
     console.log('Tablero local generado:', localBoard.map(tile => tile.value));
-    
+
     return localBoard;
   };
 
@@ -81,31 +82,34 @@ export default function Game() {
   const [isConnected, setIsConnected] = useState(false);
   const [lastSelectedTile, setLastSelectedTile] = useState(null);
   const [turnNotification, setTurnNotification] = useState('');
-  
+
   // Nuevos estados para el sistema de mesas
   const [tablesPlayed, setTablesPlayed] = useState(0);
   const [currentTableNumber, setCurrentTableNumber] = useState(1); // Iniciar en mesa 1
   const [maxTablesReached, setMaxTablesReached] = useState(false);
   const [tableLockReason, setTableLockReason] = useState('');
-  
+
   // Estado para alertas (restaurado para mostrar alertas)
   const [showAlert, setShowAlert] = useState(false);
   const [alertType, setAlertType] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  
+
   // Estado para modal de administrador
   const [showAdminModal, setShowAdminModal] = useState(false);
-  
+
   // Nuevo estado para el bloqueo por puntaje
   const [isScoreLocked, setIsScoreLocked] = useState(false);
-  
+
+  // Añadir estado para controlar la lluvia de monedas
+  const [showCoinRain, setShowCoinRain] = useState(false);
+
   const router = useRouter();
-  
+
   // Referencias para los sonidos
   const winSoundRef = useRef(null);
   const loseSoundRef = useRef(null);
   const turnSoundRef = useRef(null); // Nuevo para sonido de turno
-  
+
   // Referencia para seguimiento de cambios en puntuación
   const prevScoreRef = useRef();
 
@@ -115,11 +119,11 @@ export default function Game() {
     if (!playerId || playerId === user?.id) {
       if (audioRef && audioRef.current) {
         audioRef.current.volume = volume;
-        
+
         // Reseteamos la reproducción
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
-        
+
         // Usar Promise.catch para manejar errores silenciosamente
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
@@ -145,27 +149,39 @@ export default function Game() {
   const showPointsAlert = (points) => {
     const isPositive = points > 0;
     setAlertType(isPositive ? 'success' : 'error');
-    setAlertMessage(isPositive 
-      ? `¡Ganaste ${points} puntos!` 
+    setAlertMessage(isPositive
+      ? `¡Ganaste ${points} puntos!`
       : `¡Perdiste ${Math.abs(points)} puntos!`);
     setShowAlert(true);
-    
+
     // Reproducir el sonido correspondiente - Solo para el jugador actual
     if (isPositive) {
       playSoundSafely(winSoundRef);
     } else {
       playSoundSafely(loseSoundRef);
     }
-    
+
+    // Mostrar lluvia de monedas solo si ganó puntos
+    if (isPositive) {
+      setShowCoinRain(true);
+      playSoundSafely(winSoundRef);
+    } else {
+      playSoundSafely(loseSoundRef);
+    }
+
     setTimeout(() => {
       setShowAlert(false);
     }, 2000);
   };
 
+  const handleCoinRainComplete = () => {
+    setShowCoinRain(false);
+  };
+
   // Función para actualizar el puntaje local con persistencia
   const updateLocalScore = (newScore) => {
     setLocalScore(newScore);
-    
+
     try {
       const userData = sessionStorage.getItem('user');
       if (userData) {
@@ -194,7 +210,7 @@ export default function Game() {
         isLockedDueToScore: user.isLockedDueToScore,
         isBlocked: user.isBlocked
       });
-      
+
       // Inicializar el estado de bloqueo por puntaje
       setIsScoreLocked(user.isLockedDueToScore || false);
     }
@@ -214,7 +230,7 @@ export default function Game() {
       setScore(parsedUser.score || 60000);
       setLocalScore(parsedUser.score || 60000);
       setIsScoreLocked(parsedUser.isLockedDueToScore || false);
-      
+
       // Inicializar referencia de puntuación
       prevScoreRef.current = parsedUser.score || 60000;
 
@@ -236,24 +252,24 @@ export default function Game() {
 
       socket.on('connect', () => {
         setIsConnected(true);
-        
+
         // Enviar evento para reconectar al usuario
         socket.emit('reconnectUser', {
           userId: parsedUser.id,
           username: parsedUser.username
         });
-        
+
         // Solicitar sincronización de estado del juego para obtener la mesa actual
         socket.emit('syncGameState', { userId: parsedUser.id });
-        
+
         // NUEVO: Verificar estado de mesas al conectar
         socket.emit('checkTableStatus', { userId: parsedUser.id });
-        
+
         // Unirse al juego
         socket.emit('joinGame');
-        
+
         setGameStatus('playing');
-        
+
         if (players.length <= 1) {
           setIsYourTurn(true);
         }
@@ -262,7 +278,7 @@ export default function Game() {
       socket.on('connect_error', (err) => {
         setIsConnected(false);
         setMessage('Error de conexión con el servidor. Reintentando...');
-        
+
         setTimeout(() => {
           if (!socket.connected) {
             socket.connect();
@@ -286,7 +302,7 @@ export default function Game() {
 
       socket.on('reconnect', (attemptNumber) => {
         setIsConnected(true);
-        
+
         socket.emit('syncGameState', { userId: parsedUser.id });
         socket.emit('joinGame');
       });
@@ -297,7 +313,7 @@ export default function Game() {
           setPlayers(prevPlayers => {
             // Crear una copia para modificar
             const updatedPlayers = [...prevPlayers];
-            
+
             // Actualizar el estado de conexión de cada jugador
             players.forEach(playerUpdate => {
               const index = updatedPlayers.findIndex(p => p.id === playerUpdate.id);
@@ -308,10 +324,10 @@ export default function Game() {
                 };
               }
             });
-            
+
             return updatedPlayers;
           });
-          
+
           // Si solo hay un jugador conectado y soy yo, darme el turno
           const connectedPlayers = players.filter(p => p.isConnected);
           if (connectedPlayers.length === 1 && connectedPlayers[0].id === parsedUser.id) {
@@ -330,7 +346,7 @@ export default function Game() {
           setMessage('Tu cuenta está bloqueada por alcanzar o llegar a 23000 puntos');
         }, 5000);
       });
-      
+
       socket.on('userUnlocked', ({ message }) => {
         setIsScoreLocked(false);
         setMessage(message);
@@ -348,7 +364,7 @@ export default function Game() {
       socket.on('blockStatusChanged', ({ isBlocked, isLockedDueToScore, message }) => {
         if (isBlocked !== undefined) {
           setUser(prev => ({ ...prev, isBlocked }));
-          
+
           // Actualizar los datos del usuario en sessionStorage
           try {
             const userData = sessionStorage.getItem('user');
@@ -361,11 +377,11 @@ export default function Game() {
             console.error('Error actualizando sessionStorage:', error);
           }
         }
-        
+
         if (isLockedDueToScore !== undefined) {
           setIsScoreLocked(isLockedDueToScore);
           setUser(prev => ({ ...prev, isLockedDueToScore }));
-          
+
           // Actualizar los datos del usuario en sessionStorage
           try {
             const userData = sessionStorage.getItem('user');
@@ -378,7 +394,7 @@ export default function Game() {
             console.error('Error actualizando sessionStorage:', error);
           }
         }
-        
+
         if (message) {
           setMessage(message);
           setTimeout(() => setMessage(''), 3000);
@@ -388,19 +404,19 @@ export default function Game() {
       // Nuevo evento para manejar cambios en la conexión de jugadores
       socket.on('playerConnectionChanged', ({ playerId, isConnected, username }) => {
         // Actualizar la lista de jugadores localmente
-        setPlayers(prevPlayers => 
-          prevPlayers.map(player => 
-            player.id === playerId 
-              ? { ...player, isConnected } 
+        setPlayers(prevPlayers =>
+          prevPlayers.map(player =>
+            player.id === playerId
+              ? { ...player, isConnected }
               : player
           )
         );
-        
+
         // Mostrar mensaje informativo
-        const message = isConnected 
-          ? `${username} se ha reconectado al juego` 
+        const message = isConnected
+          ? `${username} se ha reconectado al juego`
           : `${username} se ha desconectado del juego`;
-        
+
         setMessage(message);
         setTimeout(() => setMessage(''), 3000);
       });
@@ -410,13 +426,13 @@ export default function Game() {
         if (tablesPlayed !== undefined) {
           setTablesPlayed(tablesPlayed);
         }
-        
+
         if (currentTable !== undefined) {
           setCurrentTableNumber(currentTable);
         }
-        
+
         setMaxTablesReached(maxReached || false);
-        
+
         if (lockReason) {
           setTableLockReason(lockReason);
         }
@@ -426,12 +442,12 @@ export default function Game() {
       socket.on('boardReset', ({ message, newTableNumber, newBoard, connectedPlayers }) => {
         setMessage(message);
         setTimeout(() => setMessage(''), 3000);
-        
+
         // Actualizar número de mesa
         if (newTableNumber !== undefined) {
           setCurrentTableNumber(newTableNumber);
         }
-        
+
         // Reiniciar completamente el tablero con el tablero nuevo
         if (newBoard) {
           setBoard(prevBoard => {
@@ -445,20 +461,20 @@ export default function Game() {
           // Si no se recibe un tablero nuevo, generar uno localmente
           setBoard(generateLocalBoard());
         }
-        
+
         // Reiniciar selecciones por hilera
         setRowSelections([0, 0, 0, 0]);
-        
+
         // Actualizar el estado de conexión de los jugadores en la lista local
         if (connectedPlayers && Array.isArray(connectedPlayers)) {
-          setPlayers(prevPlayers => 
+          setPlayers(prevPlayers =>
             prevPlayers.map(player => ({
               ...player,
               isConnected: connectedPlayers.includes(player.id)
             }))
           );
         }
-        
+
         // Si solo hay un jugador conectado y soy yo, darme el turno directamente
         if (connectedPlayers && connectedPlayers.length === 1 && connectedPlayers[0] === parsedUser.id) {
           setIsYourTurn(true);
@@ -470,18 +486,18 @@ export default function Game() {
       // Nuevo evento para solicitud de sincronización forzada
       socket.on('forceSyncRequest', ({ userId }) => {
         console.log("Recibida solicitud de sincronización forzada");
-        
+
         // Asegurarse de que es para nuestro usuario
         if (userId === parsedUser.id) {
           // Limpiar estados locales del juego
           setRowSelections([0, 0, 0, 0]);
           setCanSelectTiles(true);
           setIsScoreLocked(false);
-          
+
           // Generar nuevo tablero local fresco
           const newBoard = generateLocalBoard();
           setBoard(newBoard);
-          
+
           // Solicitar sincronización completa con el servidor
           socket.emit('syncGameState', { userId: parsedUser.id });
         }
@@ -490,7 +506,7 @@ export default function Game() {
       // Evento para mensaje de reinicio
       socket.on('gameResetMessage', ({ message, command }) => {
         setMessage(message);
-        
+
         if (command === "resetComplete") {
           // Restablecer estados locales críticos
           setCanSelectTiles(true);
@@ -498,7 +514,7 @@ export default function Game() {
           setLocalScore(60000);
           setScore(60000);
           setIsScoreLocked(false);
-          
+
           // Actualizar en sessionStorage
           try {
             const userData = sessionStorage.getItem('user');
@@ -513,92 +529,92 @@ export default function Game() {
             console.error('Error actualizando sessionStorage:', error);
           }
         }
-        
+
         setTimeout(() => setMessage(''), 5000);
       });
 
       // En el componente Game, dentro de los event listeners de useEffect
-socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelections, playerSelections }) => {
-  console.log("Juego completamente reiniciado");
-  
-  setBoard(newBoard || generateLocalBoard());
-  setGameStatus(status || 'playing');
-  setRowSelections(rowSelections || [0, 0, 0, 0]); // Usar las selecciones recibidas o reiniciar
-  setCanSelectTiles(true);
-  setMessage(message);
-  
-  // Actualizar el estado de conexión de los jugadores
-  if (Array.isArray(players)) {
-    setPlayers(prevPlayers => {
-      const updatedPlayers = [...prevPlayers];
-      
-      // Actualizar el estado de conexión según la información recibida
-      players.forEach(playerUpdate => {
-        const index = updatedPlayers.findIndex(p => p.id === playerUpdate.id);
-        if (index !== -1) {
-          updatedPlayers[index] = {
-            ...updatedPlayers[index],
-            isConnected: playerUpdate.isConnected
-          };
+      socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelections, playerSelections }) => {
+        console.log("Juego completamente reiniciado");
+
+        setBoard(newBoard || generateLocalBoard());
+        setGameStatus(status || 'playing');
+        setRowSelections(rowSelections || [0, 0, 0, 0]); // Usar las selecciones recibidas o reiniciar
+        setCanSelectTiles(true);
+        setMessage(message);
+
+        // Actualizar el estado de conexión de los jugadores
+        if (Array.isArray(players)) {
+          setPlayers(prevPlayers => {
+            const updatedPlayers = [...prevPlayers];
+
+            // Actualizar el estado de conexión según la información recibida
+            players.forEach(playerUpdate => {
+              const index = updatedPlayers.findIndex(p => p.id === playerUpdate.id);
+              if (index !== -1) {
+                updatedPlayers[index] = {
+                  ...updatedPlayers[index],
+                  isConnected: playerUpdate.isConnected
+                };
+              }
+            });
+
+            return updatedPlayers;
+          });
+        }
+
+        // Establecer turno para jugador único
+        if (players && players.filter(p => p.isConnected).length <= 1) {
+          setIsYourTurn(true);
+          setTimeLeft(6);
+        } else if (currentPlayer && currentPlayer.id === user.id) {
+          setIsYourTurn(true);
+          setTimeLeft(6);
+        }
+
+        // Actualizar información visual
+        setIsScoreLocked(false);
+        setUser(prev => ({ ...prev, isBlocked: false, isLockedDueToScore: false }));
+
+        // Actualizar en sessionStorage
+        try {
+          const userData = sessionStorage.getItem('user');
+          if (userData) {
+            const userObj = JSON.parse(userData);
+            userObj.isBlocked = false;
+            userObj.isLockedDueToScore = false;
+            userObj.score = 60000;
+            sessionStorage.setItem('user', JSON.stringify(userObj));
+          }
+        } catch (error) {
+          console.error('Error actualizando sessionStorage:', error);
         }
       });
-      
-      return updatedPlayers;
-    });
-  }
-  
-  // Establecer turno para jugador único
-  if (players && players.filter(p => p.isConnected).length <= 1) {
-    setIsYourTurn(true);
-    setTimeLeft(6);
-  } else if (currentPlayer && currentPlayer.id === user.id) {
-    setIsYourTurn(true);
-    setTimeLeft(6);
-  }
-  
-  // Actualizar información visual
-  setIsScoreLocked(false);
-  setUser(prev => ({ ...prev, isBlocked: false, isLockedDueToScore: false }));
-  
-  // Actualizar en sessionStorage
-  try {
-    const userData = sessionStorage.getItem('user');
-    if (userData) {
-      const userObj = JSON.parse(userData);
-      userObj.isBlocked = false;
-      userObj.isLockedDueToScore = false;
-      userObj.score = 60000;
-      sessionStorage.setItem('user', JSON.stringify(userObj));
-    }
-  } catch (error) {
-    console.error('Error actualizando sessionStorage:', error);
-  }
-});
 
       // Actualizar el manejador del evento forceGameStateRefresh
       socket.on('forceGameStateRefresh', (gameState) => {
         console.log("Forzando actualización de estado del juego");
-        
+
         // Verificar que el estado contenga información válida
         if (gameState && gameState.board && Array.isArray(gameState.board)) {
           setBoard(gameState.board);
           setCurrentPlayer(gameState.currentPlayer);
           setPlayers(gameState.players || []);
           setGameStatus(gameState.status || 'playing');
-          
+
           // Reiniciar variables críticas y permitir explícitamente jugar
           setCanSelectTiles(gameState.canSelectTiles !== undefined ? gameState.canSelectTiles : true);
-          
+
           // Verificar si es mi turno
-          const isCurrentUserTurn = (gameState.players && gameState.players.length <= 1) || 
+          const isCurrentUserTurn = (gameState.players && gameState.players.length <= 1) ||
             (gameState.currentPlayer && gameState.currentPlayer.id === parsedUser.id);
-          
+
           setIsYourTurn(isCurrentUserTurn);
-          
+
           if (isCurrentUserTurn) {
             setTimeLeft(6);
           }
-          
+
           // Actualizar selecciones por hilera
           if (gameState.rowSelections) {
             setRowSelections(gameState.rowSelections);
@@ -608,7 +624,7 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
           // En caso de datos inválidos, generar un nuevo tablero local
           setBoard(generateLocalBoard());
           setCanSelectTiles(true);
-          
+
           // Si es el único jugador, darle el turno
           if (players.length <= 1) {
             setIsYourTurn(true);
@@ -623,10 +639,10 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
           console.error("gameState recibido es undefined o null");
           return;
         }
-        
+
         // Establecer jugadores a un array vacío si no existe
         const gamePlayers = gameState.players || [];
-        
+
         if (gamePlayers.length <= 1) {
           gameState.status = 'playing';
         }
@@ -638,7 +654,7 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
             if (!Array.isArray(prev) || prev.length === 0) {
               return gameState.board;
             }
-            
+
             const updatedBoard = [...prev];
             // Solo actualizar las fichas que están reveladas en el estado del juego
             for (let i = 0; i < Math.min(updatedBoard.length, gameState.board.length); i++) {
@@ -656,25 +672,25 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
         } else {
           console.warn("gameState.board no es válido:", gameState.board);
         }
-        
+
         // Verificar si ha cambiado el jugador actual
         const prevPlayerId = currentPlayer?.id;
         const newPlayerId = gameState.currentPlayer?.id;
-        
+
         setCurrentPlayer(gameState.currentPlayer);
         setPlayers(gamePlayers);
         setGameStatus(gameState.status || 'playing');
-        
-        const isCurrentUserTurn = (gamePlayers.length <= 1) || 
+
+        const isCurrentUserTurn = (gamePlayers.length <= 1) ||
           (gameState.currentPlayer && gameState.currentPlayer.id === parsedUser.id);
-        
+
         setIsYourTurn(isCurrentUserTurn);
-        
+
         if (isCurrentUserTurn) {
           setTimeLeft(6); // Cambiado a 6 segundos
           setCanSelectTiles(true);
         }
-        
+
         if (gameState.rowSelections) {
           setRowSelections(gameState.rowSelections);
         }
@@ -710,12 +726,12 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
           if (!Array.isArray(prevBoard) || prevBoard.length === 0) {
             return prevBoard;
           }
-          
+
           const newBoard = [...prevBoard];
           if (newBoard[tileIndex]) {
-            newBoard[tileIndex] = { 
-              ...newBoard[tileIndex], 
-              revealed: true, 
+            newBoard[tileIndex] = {
+              ...newBoard[tileIndex],
+              revealed: true,
               // Usar el valor que viene del servidor, no el local
               value: tileValue,
               lastSelected: true,
@@ -724,17 +740,17 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
           }
           return newBoard;
         });
-        
+
         setLastSelectedTile({
           index: tileIndex,
           playerId: playerId,
           playerUsername: playerUsername,
           timestamp: timestamp
         });
-        
+
         // Determinar si es el jugador actual
         const isCurrentPlayer = playerId === parsedUser.id;
-        
+
         // Solo reproducir sonidos si es el jugador actual
         if (isCurrentPlayer) {
           // Determinar el tipo de sonido basado en el valor real
@@ -744,12 +760,12 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
           } else {
             playSoundSafely(loseSoundRef, 1.0);
           }
-          
+
           // Mostrar alerta y actualizar puntaje solo para el jugador actual
           showPointsAlert(tileValue);
           updateLocalScore(newScore);
         }
-        
+
         if (rowSelections) {
           setRowSelections(rowSelections);
         }
@@ -759,7 +775,7 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
         if (playerId === parsedUser.id) {
           setTimeLeft(0);
           setCanSelectTiles(false);
-          
+
           if (players.length > 1) {
             setIsYourTurn(false);
           } else {
@@ -849,7 +865,7 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
   useEffect(() => {
     // Si el usuario no puede seleccionar fichas por más de 10 segundos y debería poder
     let problemDetectionTimer = null;
-    
+
     if (isYourTurn && !canSelectTiles && !isScoreLocked && !user?.isBlocked && !maxTablesReached) {
       problemDetectionTimer = setTimeout(() => {
         console.log("Detectado posible problema de interacción, intentando corregir...");
@@ -859,7 +875,7 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
         socket.emit('checkTableStatus', { userId: user.id });
       }, 10000);
     }
-    
+
     return () => {
       if (problemDetectionTimer) {
         clearTimeout(problemDetectionTimer);
@@ -870,29 +886,29 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
   // Efecto para el temporizador optimizado
   useEffect(() => {
     let timer;
-    
+
     if (isYourTurn) {
       // Iniciar siempre con 6 segundos exactos
       setTimeLeft(6);
       setCanSelectTiles(true);
-      
+
       // Reproducir sonido de turno siempre que sea tu turno
       // (ya sea único jugador o multijugador)
       playSoundSafely(turnSoundRef);
-      
+
       // Asegurar que el intervalo sea exactamente de 1 segundo
       let previousTime = Date.now();
-      
+
       timer = setInterval(() => {
         const currentTime = Date.now();
         // Ajustar el intervalo si es necesario
         const drift = currentTime - previousTime - 1000;
         previousTime = currentTime;
-        
+
         setTimeLeft((prevTime) => {
           const newTime = prevTime - 1;
           console.log(`Temporizador: ${newTime} segundos (drift: ${drift}ms)`);
-          
+
           if (newTime <= 0) {
             clearInterval(timer);
             setCanSelectTiles(false);
@@ -904,7 +920,7 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
     } else {
       clearInterval(timer);
     }
-    
+
     return () => {
       if (timer) {
         clearInterval(timer);
@@ -927,7 +943,7 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
           return newBoard;
         });
       }, 2000);
-      
+
       return () => clearTimeout(timer);
     }
   }, [lastSelectedTile]);
@@ -937,14 +953,14 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
     // Verificar cambios grandes en la puntuación (más de 15000 puntos)
     if (prevScoreRef.current && Math.abs(localScore - prevScoreRef.current) > 15000) {
       console.warn(`Cambio sospechoso en puntuación: ${prevScoreRef.current} -> ${localScore}`);
-      
+
       // Solicitar sincronización de puntuación con el servidor
       if (socket && socket.connected && user?.id) {
         console.log('Solicitando sincronización de puntaje debido a cambio sospechoso');
         socket.emit('syncScore', { userId: user.id });
       }
     }
-    
+
     // Actualizar la referencia para la próxima comparación
     prevScoreRef.current = localScore;
   }, [localScore, socket, user]);
@@ -957,28 +973,28 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
       setTimeout(() => setMessage(''), 3000);
       return;
     }
-    
+
     // No permitir seleccionar fichas si está bloqueado por puntaje
     if (isScoreLocked) {
       setMessage("Tu cuenta está bloqueada por alcanzar 23000 puntos. Contacta al administrador.");
       setTimeout(() => setMessage(''), 3000);
       return;
     }
-    
+
     // No permitir seleccionar fichas si el usuario está bloqueado por el administrador
     if (user?.isBlocked) {
       setMessage("Tu cuenta está bloqueada. Puedes ver el juego pero no jugar.");
       setTimeout(() => setMessage(''), 3000);
       return;
     }
-    
+
     // No permitir seleccionar fichas si se alcanzó el límite de mesas
     if (maxTablesReached) {
       setMessage(`Límite de mesas alcanzado. ${tableLockReason}`);
       setTimeout(() => setMessage(''), 3000);
       return;
     }
-    
+
     // Validar que haya un tablero válido
     if (!Array.isArray(board) || board.length === 0) {
       console.error("El tablero no es válido");
@@ -990,57 +1006,57 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
       setTimeout(() => setMessage(''), 3000);
       return;
     }
-    
+
     // Validar que el índice sea válido
     if (index < 0 || index >= board.length) {
       console.error(`Índice de ficha inválido: ${index}`);
       return;
     }
-    
+
     // Validar que la ficha existe en el tablero
     if (!board[index]) {
       console.error(`La ficha en el índice ${index} no existe`);
       return;
     }
-    
+
     // Verificar si ya está revelada
     if (board[index].revealed) {
       console.log("Esta ficha ya está revelada");
       return;
     }
-    
+
     if (!canSelectTiles) {
       setMessage("¡No puedes seleccionar más fichas en este turno!");
       setTimeout(() => setMessage(''), 2000);
       return;
     }
-    
+
     if (!isYourTurn && players.length > 1) {
       setMessage("¡Espera tu turno!");
       setTimeout(() => setMessage(''), 2000);
       return;
     }
-    
+
     if (timeLeft <= 0) {
       setMessage("¡Tiempo agotado para este turno!");
       setTimeout(() => setMessage(''), 2000);
       return;
     }
-    
+
     const row = Math.floor(index / 4);
-    
+
     if (rowSelections[row] >= 2) {
       setMessage(`¡Límite de 2 fichas por hilera alcanzado en hilera ${row + 1}!`);
       setTimeout(() => setMessage(''), 2000);
       return;
     }
-    
+
     const tileValue = board[index]?.value || 0;
     if (!board[index]?.revealed) {
       // IMPORTANTE: Usar setState con callback para asegurar que se base en el valor actual
       setLocalScore(prevScore => {
         const newScore = prevScore + tileValue;
-        
+
         // Guardar en sessionStorage de manera segura
         try {
           const userData = sessionStorage.getItem('user');
@@ -1053,46 +1069,46 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
         } catch (error) {
           console.error('Error actualizando sessionStorage:', error);
         }
-        
+
         return newScore;
       });
-      
+
       // Actualizar el tablero localmente para feedback inmediato
       setBoard(prevBoard => {
         const newBoard = [...prevBoard];
         if (newBoard[index]) {
-          newBoard[index] = { 
-            ...newBoard[index], 
+          newBoard[index] = {
+            ...newBoard[index],
             revealed: true,
             lastSelected: true
           };
         }
         return newBoard;
       });
-      
+
       // Actualizar las selecciones de hilera y verificar si se debe avanzar al siguiente tablero
       setRowSelections(prev => {
         const updated = [...prev];
         updated[row]++;
-        
+
         // Verificar si se han completado las selecciones en todas las hileras
         const allRowsFull = updated.every(count => count >= 2);
-        
+
         // Si todas las hileras están completas y hay un solo jugador o somos el único activo,
         // avanzar al siguiente tablero
         if (allRowsFull && (players.length <= 1 || players.filter(p => p.isConnected).length <= 1)) {
           console.log('Jugador único completó todas sus selecciones, avanzando al siguiente tablero');
-          
+
           // Incrementar contador de mesas mediante socket
           socket.emit('completeBoard', { userId: user.id });
         }
-        
+
         return updated;
       });
     }
-    
+
     // Emisión al servidor con información completa
-    socket.emit('selectTile', { 
+    socket.emit('selectTile', {
       tileIndex: index,
       currentScore: localScore // Enviar el puntaje actual para verificación
     });
@@ -1109,9 +1125,9 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
           value={tile?.value || 0}
           onClick={() => handleTileClick(index)}
           disabled={
-            tile?.revealed || 
-            !canSelectTiles || 
-            timeLeft <= 0 || 
+            tile?.revealed ||
+            !canSelectTiles ||
+            timeLeft <= 0 ||
             rowSelections[Math.floor(index / 4)] >= 2 ||
             maxTablesReached ||
             isScoreLocked ||
@@ -1148,28 +1164,28 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
     <>
       {/* Componente para ocultar el logo programáticamente */}
       <HideLogoEffect />
-      
+
       {(user?.isAdmin || user?.username?.toLowerCase() === "admin") && (
-        <button 
+        <button
           className="admin-panel-button"
           onClick={handleAdminPanel}
         >
           Panel de Admin
         </button>
       )}
-    
+
       <div className="game-container game-page">
         <audio ref={winSoundRef} src="/sounds/win.mp3" preload="auto"></audio>
         <audio ref={loseSoundRef} src="/sounds/lose.mp3" preload="auto"></audio>
         <audio ref={turnSoundRef} src="/sounds/turno.mp3" preload="auto"></audio>
-        
+
         {/* Restaurar las alertas de puntos, pero solo para el jugador actual */}
         {showAlert && (
           <div className={`points-alert ${alertType}`}>
             {alertMessage}
           </div>
         )}
-        
+
         <div className="game-info">
           <div className="game-header">
             <h2>Jugador: {user?.username}</h2>
@@ -1177,7 +1193,7 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
               Cerrar Sesión
             </button>
           </div>
-          
+
           {isConnected ? (
             <div className="connection-status connected">Conectado al servidor</div>
           ) : (
@@ -1237,22 +1253,25 @@ socket.on('gameCompletelyReset', ({ message, newBoard, status, players, rowSelec
             Jugador actual: <span className="current-player-name">{currentPlayer.username}</span>
           </div>
         )}
-        
+
         {/* Lista de jugadores conectados */}
         <div className="players-section">
           <h3>Jugadores conectados</h3>
           <PlayerList players={players} currentPlayerId={currentPlayer?.id} />
         </div>
-        
+
         {showAdminModal && (
-          <AdminButton 
-            onClose={() => setShowAdminModal(false)} 
+          <AdminButton
+            onClose={() => setShowAdminModal(false)}
             socket={socket}
           />
         )}
-        
+
         {/* Botón de WhatsApp */}
         <WhatsAppButton phoneNumber="5492945552523" />
+
+        {/* Componente de lluvia de monedas */}
+        <CoinRain active={showCoinRain} onComplete={handleCoinRainComplete} />
       </div>
     </>
   );

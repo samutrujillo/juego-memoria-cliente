@@ -1,11 +1,28 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import '@/styles/Tile.css';
 
 const Tile = ({ index, revealed, value, onClick, disabled, lastSelected, selectedBy, currentUsername }) => {
+  const [isGlowing, setIsGlowing] = useState(false);
+  
   // Determinar la fila basada en el índice
   const row = Math.floor(index / 4);
+  
+  // Efecto de brillo para fichas disponibles
+  useEffect(() => {
+    // Solo aplicar brillo a fichas disponibles (no reveladas y no deshabilitadas)
+    if (!revealed && !disabled) {
+      // Iniciar el ciclo de brillo
+      const glowInterval = setInterval(() => {
+        setIsGlowing(prev => !prev);
+      }, 700); // Alternar cada 700ms
+      
+      return () => clearInterval(glowInterval);
+    } else {
+      setIsGlowing(false);
+    }
+  }, [revealed, disabled]);
   
   // Determinar el color basado en la fila (para fichas no reveladas)
   // y en el valor (para fichas reveladas)
@@ -70,6 +87,11 @@ const Tile = ({ index, revealed, value, onClick, disabled, lastSelected, selecte
     // Añadir clase para la última ficha seleccionada
     if (lastSelected) {
       classes.push('last-selected');
+    }
+    
+    // Añadir clase para el efecto de brillo
+    if (isGlowing && !revealed && !disabled) {
+      classes.push('glowing');
     }
     
     return `${baseClass} ${classes.join(' ')}`;
