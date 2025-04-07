@@ -605,3 +605,84 @@
     margin-top: 30px; /* Espacio para el botón de admin */
   }
 }
+
+/* Estilos base para la alerta de bloqueo de mesa */
+.table-lock-alert {
+  background-color: rgba(244, 67, 54, 0.9);
+  color: white;
+  padding: 10px 15px;
+  border-radius: 4px;
+  margin: 10px auto;
+  text-align: center;
+  animation: pulse 2s infinite;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  width: 80%;
+  max-width: 600px;
+}
+
+.table-lock-alert p {
+  margin: 0 0 10px 0;
+  font-weight: bold;
+  font-size: 0.95rem;
+}
+
+.unlock-all-tables-btn {
+  background-color: #9c27b0;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  margin: 5px auto;
+  display: block;
+  transition: background-color 0.2s;
+}
+
+.unlock-all-tables-btn:hover {
+  background-color: #7b1fa2;
+}
+
+/* Estilos para móviles - significativamente más pequeños */
+@media (max-width: 480px) {
+  .table-lock-alert {
+    width: 70%;
+    padding: 4px 6px;
+    margin: 4px auto;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+  
+  .table-lock-alert p {
+    font-size: 0.65rem;
+    margin-bottom: 3px;
+    line-height: 1.1;
+  }
+  
+  .unlock-all-tables-btn {
+    font-size: 0.65rem;
+    padding: 3px 8px;
+    min-height: 0;
+    border-radius: 3px;
+    width: auto;
+    display: inline-block;
+  }
+}
+
+/* Estilos para pantallas muy pequeñas */
+@media (max-width: 360px) {
+  .table-lock-alert {
+    width: 60%;
+    padding: 3px 4px;
+    margin: 3px auto;
+  }
+  
+  .table-lock-alert p {
+    font-size: 0.6rem;
+    margin-bottom: 2px;
+  }
+  
+  .unlock-all-tables-btn {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+  }
+}
