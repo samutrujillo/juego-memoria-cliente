@@ -25,7 +25,7 @@ export default function Home() {
 
     socket.on('connect_error', (error) => {
       console.error('Error de conexión con el servidor:', error.message);
-      setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
+      setError('No se pudo conectar con el servidor. Recarga la pagina');
     });
 
     // Limpiar al desmontar
