@@ -18,16 +18,16 @@ export default function Home() {
   useEffect(() => {
     // Inicializar socket con la configuración centralizada
     socket = io(config.socketServerUrl, config.socketOptions);
-
+    
     socket.on('connect', () => {
       console.log('Conectado al servidor con ID:', socket.id);
     });
-
+    
     socket.on('connect_error', (error) => {
       console.error('Error de conexión con el servidor:', error.message);
       setError('No se pudo conectar con el servidor. Recarga la pagina');
     });
-
+    
     // Limpiar al desmontar
     return () => {
       socket.disconnect();
@@ -40,7 +40,7 @@ export default function Home() {
       setError('Por favor, ingresa un nombre de usuario y contraseña');
       return;
     }
-
+    
     console.log(`Intentando iniciar sesión con: ${username}`);
     socket.emit('login', { username, password }, (response) => {
       console.log('Respuesta del servidor:', response);
@@ -75,6 +75,38 @@ export default function Home() {
     });
   };
 
+  // Estilos en línea para el contador de puntos
+  const scoreContainerStyle = {
+    width: '100%',
+    display: 'flex',
+    justifyContent: 'center',
+    position: 'absolute',
+    bottom: '22%', // Posicionado en la parte inferior de la página pero no muy abajo
+    left: 0,
+    right: 0
+  };
+
+  const scoreTextStyle = {
+    fontSize: '36px',
+    fontWeight: 'bold',
+    fontFamily: 'Arial, sans-serif',
+    display: 'flex',
+    alignItems: 'center'
+  };
+
+  const positiveScoreStyle = {
+    color: '#0f0', // Verde más brillante y fluorescente como en la imagen
+  };
+
+  const separatorStyle = {
+    color: 'white',
+    margin: '0 10px'
+  };
+
+  const negativeScoreStyle = {
+    color: '#f55', // Rojo más brillante como en la imagen
+  };
+
   return (
     <main className="login-page">
       <div className="login-container">
@@ -101,6 +133,15 @@ export default function Home() {
           </div>
           <button type="submit" className="login-button">Entrar</button>
         </form>
+      </div>
+      
+      {/* Contador de puntos colocado independientemente debajo del contenedor del formulario */}
+      <div style={scoreContainerStyle}>
+        <div style={scoreTextStyle}>
+          <span style={positiveScoreStyle}>15.000</span>
+          <span style={separatorStyle}>/</span>
+          <span style={negativeScoreStyle}>- 15.000</span>
+        </div>
       </div>
     </main>
   );
