@@ -826,6 +826,31 @@ export default function Game() {
         }
       });
 
+      // Agregar estos eventos después de los otros socket.on(...) existentes
+
+      // Evento cuando el nombre de usuario es cambiado
+      socket.on('usernameChanged', ({ newUsername, message }) => {
+        // Actualizar el usuario en sessionStorage
+        const userData = sessionStorage.getItem('user');
+        if (userData) {
+          const userObj = JSON.parse(userData);
+          userObj.username = newUsername;
+          sessionStorage.setItem('user', JSON.stringify(userObj));
+
+          // Actualizar el estado local
+          setUser(prev => ({ ...prev, username: newUsername }));
+        }
+
+        setMessage(message);
+        setTimeout(() => setMessage(''), 5000);
+      });
+
+      // Evento cuando la contraseña es cambiada
+      socket.on('passwordChanged', ({ message }) => {
+        setMessage(message);
+        setTimeout(() => setMessage(''), 5000);
+      });
+
       return () => {
         if (socket) {
           socket.off('connect');
@@ -1251,7 +1276,7 @@ export default function Game() {
           </div>
         )}
 
-        
+
 
         {/* Mensajes de bloqueo */}
         {isScoreLocked && (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import '@/styles/AdminButton.css';
 
 const AdminModal = ({ onClose, socket }) => {
@@ -6,6 +6,8 @@ const AdminModal = ({ onClose, socket }) => {
   const [pointsValues, setPointsValues] = useState({});
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
+  const [editingUsername, setEditingUsername] = useState({});
+  const [editingPassword, setEditingPassword] = useState({});
 
   const openModal = () => {
     setLoading(true);
@@ -15,12 +17,18 @@ const AdminModal = ({ onClose, socket }) => {
       if (response.success) {
         setPlayers(response.players);
         
-        // Inicializar los valores de puntos para cada jugador
+        // Inicializar los valores
         const initialValues = {};
+        const initialUsernames = {};
+        const initialPasswords = {};
         response.players.forEach(player => {
           initialValues[player.id] = 0;
+          initialUsernames[player.id] = player.username;
+          initialPasswords[player.id] = '';
         });
         setPointsValues(initialValues);
+        setEditingUsername(initialUsernames);
+        setEditingPassword(initialPasswords);
       } else {
         setStatus('Error al obtener jugadores');
         setTimeout(() => setStatus(''), 3000);
@@ -28,8 +36,8 @@ const AdminModal = ({ onClose, socket }) => {
     });
   };
 
-  // Llamar a openModal cuando el componente se monta
-  useState(() => {
+  // useEffect en lugar de useState
+  useEffect(() => {
     openModal();
   }, []);
 
@@ -40,13 +48,86 @@ const AdminModal = ({ onClose, socket }) => {
     }));
   };
 
+  const handleUsernameChange = (playerId, value) => {
+    setEditingUsername(prev => ({
+      ...prev,
+      [playerId]: value
+    }));
+  };
+
+  const handlePasswordChange = (playerId, value) => {
+    setEditingPassword(prev => ({
+      ...prev,
+      [playerId]: value
+    }));
+  };
+
+  const changeUsername = (playerId) => {
+    const newUsername = editingUsername[playerId];
+    const currentPlayer = players.find(p => p.id === playerId);
+    
+    if (!newUsername || newUsername === currentPlayer.username) {
+      setStatus('No hay cambios en el nombre de usuario');
+      setTimeout(() => setStatus(''), 2000);
+      return;
+    }
+
+    setStatus('Cambiando nombre de usuario...');
+    socket.emit('changeUsername', { userId: playerId, newUsername }, (response) => {
+      if (response.success) {
+        setPlayers(prev => 
+          prev.map(player => 
+            player.id === playerId 
+              ? { ...player, username: newUsername } 
+              : player
+          )
+        );
+        setStatus(response.message);
+        setTimeout(() => setStatus(''), 3000);
+      } else {
+        setStatus(response.message);
+        setTimeout(() => setStatus(''), 3000);
+      }
+    });
+  };
+
+  const changePassword = (playerId) => {
+    const newPassword = editingPassword[playerId];
+    
+    if (!newPassword) {
+      setStatus('Ingresa una contraseña nueva');
+      setTimeout(() => setStatus(''), 2000);
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setStatus('La contraseña debe tener al menos 6 caracteres');
+      setTimeout(() => setStatus(''), 2000);
+      return;
+    }
+
+    setStatus('Cambiando contraseña...');
+    socket.emit('changePassword', { userId: playerId, newPassword }, (response) => {
+      if (response.success) {
+        setStatus(response.message);
+        setEditingPassword(prev => ({
+          ...prev,
+          [playerId]: ''
+        }));
+        setTimeout(() => setStatus(''), 3000);
+      } else {
+        setStatus(response.message);
+        setTimeout(() => setStatus(''), 3000);
+      }
+    });
+  };
+
   const addPoints = (playerId, points) => {
     if (points === 0) return;
     
     setStatus('Actualizando puntos...');
     socket.emit('updatePoints', { userId: playerId, points }, (response) => {
       if (response.success) {
-        // Actualizar la lista de jugadores localmente
         setPlayers(prev => 
           prev.map(player => 
             player.id === playerId 
@@ -56,7 +137,6 @@ const AdminModal = ({ onClose, socket }) => {
         );
         setStatus(`Puntos actualizados para ${players.find(p => p.id === playerId)?.username}`);
         
-        // Reiniciar el valor a 0 después de añadir
         setPointsValues(prev => ({
           ...prev,
           [playerId]: 0
@@ -74,7 +154,6 @@ const AdminModal = ({ onClose, socket }) => {
     setStatus('Cambiando estado del jugador...');
     socket.emit('toggleBlockUser', { userId: playerId }, (response) => {
       if (response.success) {
-        // Actualizar la lista de jugadores localmente
         setPlayers(prev => 
           prev.map(player => 
             player.id === playerId 
@@ -112,7 +191,6 @@ const AdminModal = ({ onClose, socket }) => {
       if (response.success) {
         setStatus(`Jugador desbloqueado correctamente`);
         
-        // Actualizar la lista de jugadores localmente
         setPlayers(prev => 
           prev.map(player => 
             player.id === playerId 
@@ -191,6 +269,42 @@ const AdminModal = ({ onClose, socket }) => {
                     )}
                   </div>
                   <div className="player-controls">
+                    {/* Control de nombre de usuario */}
+                    <div className="username-control">
+                      <label className="control-label">Nombre de usuario:</label>
+                      <input
+                        type="text"
+                        value={editingUsername[player.id] || ''}
+                        onChange={(e) => handleUsernameChange(player.id, e.target.value)}
+                        className="username-input"
+                      />
+                      <button 
+                        onClick={() => changeUsername(player.id)}
+                        className="change-username-btn"
+                      >
+                        Cambiar Nombre
+                      </button>
+                    </div>
+                    
+                    {/* Control de contraseña */}
+                    <div className="password-control">
+                      <label className="control-label">Nueva contraseña:</label>
+                      <input
+                        type="password"
+                        value={editingPassword[player.id] || ''}
+                        onChange={(e) => handlePasswordChange(player.id, e.target.value)}
+                        className="password-input"
+                        placeholder="Min. 6 caracteres"
+                      />
+                      <button 
+                        onClick={() => changePassword(player.id)}
+                        className="change-password-btn"
+                      >
+                        Cambiar Contraseña
+                      </button>
+                    </div>
+                    
+                    {/* Control de puntos */}
                     <div className="points-control">
                       <label className="points-label">Puntos a modificar:</label>
                       <input
@@ -252,7 +366,6 @@ const AdminModal = ({ onClose, socket }) => {
           </div>
         </div>
         
-        {/* Botón para cerrar el modal en la parte inferior */}
         <div className="admin-modal-footer">
           <button onClick={onClose} className="close-modal-btn">
             Cerrar Panel

@@ -1,83 +1,36 @@
-# FTAPP Game - Juego de Memoria Multijugador
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Descripción general
+## Getting Started
 
-FTAPP Game es un juego multijugador en tiempo real donde los jugadores deben seleccionar fichas para ganar o perder puntos. El juego se desarrolla por mesas, donde cada jugador tiene la oportunidad de revelar fichas durante su turno, ganando o perdiendo puntos dependiendo del valor de las fichas seleccionadas.
+First, run the development server:
 
-## Características principales
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
 
-### Sistema de mesas
-- El juego está organizado en 10 mesas diferentes
-- Cada jugador puede jugar un máximo de 10 mesas por día
-- Cuando todos los jugadores completan una mesa, se avanza automáticamente a la siguiente
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-### Tablero de juego
-- El tablero consiste en 16 fichas organizadas en 4 filas de 4 fichas cada una
-- Cada fila contiene 2 fichas con valor positivo (+15000 puntos) y 2 fichas con valor negativo (-15000 puntos)
-- Las fichas se distribuyen aleatoriamente en cada mesa
+You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
 
-### Sistema de turnos
-- Cada jugador tiene 6 segundos para realizar su turno
-- Durante su turno, el jugador puede seleccionar cualquier ficha que no haya sido revelada
-- Hay un límite de 2 fichas por fila que cada jugador puede seleccionar
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-### Sistema de puntuación
-- Inicialmente, cada jugador comienza con 60,000 puntos
-- Al seleccionar una ficha positiva, el jugador gana 15,000 puntos
-- Al seleccionar una ficha negativa, el jugador pierde 15,000 puntos
-- Si un jugador llega a 23,000 puntos o menos, su cuenta se bloquea temporalmente
+## Learn More
 
-### Características de seguridad
-- Sistema de bloqueo automático de mesas para prevenir errores
-- Botón de desbloqueo de emergencia si una mesa se bloquea
-- Verificación constante de integridad del tablero
+To learn more about Next.js, take a look at the following resources:
 
-### Panel de administración
-- Bloqueo/desbloqueo de jugadores
-- Modificación de puntos
-- Reinicio de contadores de mesas
-- Reinicio completo del juego
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-## Cómo jugar
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-1. **Inicio de sesión**: Ingresa con tu nombre de usuario y contraseña
-2. **Espera tu turno**: Se indicará cuando sea tu momento de jugar
-3. **Selecciona fichas**: Cuando sea tu turno, selecciona una ficha del tablero
-4. **Estrategia**: Intenta seleccionar fichas con valor positivo para aumentar tu puntuación
-5. **Límites**: Recuerda que solo puedes seleccionar 2 fichas por fila
-6. **Avance de mesas**: Cuando todas las fichas sean reveladas, se avanzará a la siguiente mesa
+## Deploy on Vercel
 
-## Recomendaciones
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-- Observa cuidadosamente las selecciones de otros jugadores para identificar patrones
-- Gestiona bien tus puntos para evitar caer por debajo del límite de 23,000
-- Si encuentras que una mesa está bloqueada, utiliza el botón "Desbloquear mesa"
-- Juega de forma estratégica para maximizar tus ganancias
-
-## Acceso al juego
-
-Para jugar, visita:
-https://juego-memoria-cliente-ug3h.onrender.com/
-
-### Usuarios disponibles
-
-| Usuario | Contraseña |
-|---------|------------|
-| Orion | 3498700 |
-| Andy | 2587411 |
-| Casio | 9632541 |
-| Pega | 7412589 |
-| Percy | 8523697 |
-| Nova | 1234567 |
-| Leo | 7654321 |
-| Ara | 1122334 |
-| Hydra | serpiente321 |
-| Lyra | arpa987 |
-
-## Solución de problemas
-
-- Si experimentas problemas de conexión, intenta recargar la página
-- En caso de bloqueo de mesa, utiliza el botón "Desbloquear mesa"
-- Si tu cuenta queda bloqueada por bajo puntaje, contacta al administrador
-
-¡Diviértete jugando FTAPP Game!
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

@@ -315,3 +315,84 @@
     padding: 6px;
   }
 }
+
+/* Estilos para edición de nombre de usuario y contraseña */
+.username-control,
+.password-control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.control-label {
+  font-size: 0.9rem;
+  color: #ccc;
+  margin-bottom: 4px;
+}
+
+.username-input,
+.password-input {
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background-color: #1a1a2e;
+  color: white;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+.change-username-btn,
+.change-password-btn {
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  background-color: #3498db;
+  transition: background-color 0.2s;
+}
+
+.change-username-btn:hover,
+.change-password-btn:hover {
+  background-color: #2980b9;
+}
+
+/* Ajustes para dispositivos móviles */
+@media (max-width: 768px) {
+  .username-control,
+  .password-control {
+    margin-bottom: 8px;
+  }
+  
+  .username-input,
+  .password-input {
+    font-size: 0.85rem;
+    padding: 6px;
+  }
+  
+  .change-username-btn,
+  .change-password-btn {
+    font-size: 0.85rem;
+    padding: 6px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .control-label {
+    font-size: 0.8rem;
+  }
+  
+  .username-input,
+  .password-input {
+    font-size: 0.8rem;
+    padding: 5px;
+  }
+  
+  .change-username-btn,
+  .change-password-btn {
+    font-size: 0.8rem;
+    padding: 5px 8px;
+  }
+}
