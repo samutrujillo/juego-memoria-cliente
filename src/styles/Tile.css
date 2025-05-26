@@ -17,41 +17,73 @@
   /* Prevenir acciones no deseadas en dispositivos táctiles */
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  /* Color exacto de la Mesa VIP - azul oscuro gradiente */
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a73 50%, #1a2f4a 100%);
 }
 
-.tile.blue {
-  background-color: #0052cc;
+/* Colores específicos removidos para fichas no reveladas - ahora todas usan el color Mesa VIP */
+.tile.blue:not(.revealed) {
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a73 50%, #1a2f4a 100%);
 }
 
-.tile.yellow {
-  background-color: #ffcc00;
-  color: #333;
+.tile.yellow:not(.revealed) {
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a73 50%, #1a2f4a 100%);
+  color: white; /* Cambiar color del texto a blanco para mejor contraste */
 }
 
-.tile.red {
-  background-color: #8d0202;
+.tile.red:not(.revealed) {
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a73 50%, #1a2f4a 100%);
 }
 
-.tile.green {
-  background-color: #00cc00;
+.tile.green:not(.revealed) {
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a73 50%, #1a2f4a 100%);
 }
 
-.tile.gray {
-  background-color: #888888;
+.tile.gray:not(.revealed) {
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a73 50%, #1a2f4a 100%);
 }
 
 .tile:hover:not(.revealed):not(.disabled) {
   transform: translateY(-5px);
   box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
+  /* Efecto hover ligeramente más claro */
+  background: linear-gradient(135deg, #2a4670 0%, #3a5a84 50%, #243659 100%);
 }
 
-/* Cambiar color de fichas reveladas para que coincidan con el fondo del tablero */
+/* Fichas reveladas ahora usan el color morado de la imagen */
 .tile.revealed {
-  background-color: #6932bb;
+  background: linear-gradient(135deg, #6a4c93 0%, #8e44ad 50%, #5d3a7a 100%);
+  color: white;
+}
+
+.tile.revealed.blue {
+  background: linear-gradient(135deg, #6a4c93 0%, #8e44ad 50%, #5d3a7a 100%);
+  color: white;
+}
+
+.tile.revealed.yellow {
+  background: linear-gradient(135deg, #6a4c93 0%, #8e44ad 50%, #5d3a7a 100%);
+  color: white;
+}
+
+.tile.revealed.red {
+  background: linear-gradient(135deg, #6a4c93 0%, #8e44ad 50%, #5d3a7a 100%);
+  color: white;
+}
+
+.tile.revealed.green {
+  background: linear-gradient(135deg, #6a4c93 0%, #8e44ad 50%, #5d3a7a 100%);
+  color: white;
+}
+
+.tile.revealed.gray {
+  background: linear-gradient(135deg, #6a4c93 0%, #8e44ad 50%, #5d3a7a 100%);
+  color: white;
 }
 
 .tile.revealed.winner, .tile.revealed.loser {
-  background-color: #6932bb;
+  background: linear-gradient(135deg, #6a4c93 0%, #8e44ad 50%, #5d3a7a 100%);
+  color: white;
 }
 
 .tile.disabled {
@@ -98,7 +130,6 @@
   transform-origin: center;
 }
 
-
 /* Clases para los iconos de las fichas */
 .tile-icon {
   width: 80%;
@@ -113,14 +144,14 @@
   100% { box-shadow: 0 0 0 rgba(255, 255, 255, 0); }
 }
 
-/* Añadir efecto de brillo para fichas disponibles */
+/* Añadir efecto de brillo para fichas disponibles con el nuevo color */
 @keyframes glowing {
   0% {
     box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
     transform: scale(1);
   }
   50% {
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.7), 0 0 30px rgba(255, 215, 0, 0.5);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.7), 0 0 30px rgba(30, 58, 95, 0.5);
     transform: scale(1.05);
   }
   100% {
