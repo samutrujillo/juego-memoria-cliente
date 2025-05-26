@@ -80,3 +80,28 @@
     width: 90%;
   }
 }
+
+/* Añadir estos estilos */
+.buttons-container {
+  display: flex;
+  gap: 10px;
+  flex-direction: column;
+}
+
+.login-button {
+  /* Mantener estilos existentes */
+  width: 100%;
+  text-align: center;
+}
+
+.home-button {
+  background-color: #bb0019;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-button:hover {
+  background-color: #9e1e19;
+}
