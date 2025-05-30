@@ -144,14 +144,7 @@ export default function Home() {
         </a>
         </form>
       </div>
-      
-      {/* Contador de puntos colocado independientemente debajo del contenedor del formulario */}
-      <div style={scoreContainerStyle}>
-        <div style={scoreTextStyle}>
-          <span style={positiveScoreStyle}>15.000</span>
-          <span style={separatorStyle}>/</span>
-          <span style={negativeScoreStyle}>- 15.000</span>
-        </div>
+
       </div>
     </main>
   );
