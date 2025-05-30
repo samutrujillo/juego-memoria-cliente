@@ -144,8 +144,6 @@ export default function Home() {
         </a>
         </form>
       </div>
-
-      </div>
     </main>
   );
 }
