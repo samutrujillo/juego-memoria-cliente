@@ -1247,6 +1247,7 @@ export default function Game() {
         <div className="game-status-bar">
           <div className="table-info">
             Mesa {currentTableNumber}
+          <div className="table-amount">15.000</div>
           </div>
           <div className={`turn-status ${isYourTurn ? 'your-turn-indicator' : 'wait-turn-indicator'}`}>
             {isYourTurn ? "Tu turno" : "Espere su turno"}
