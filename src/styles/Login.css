@@ -105,3 +105,32 @@
 .home-button:hover {
   background-color: #9e1e19;
 }
+
+.title-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.vip-title {
+  color: white;
+  font-size: 2.5rem;
+  font-weight: bold;
+  text-align: center;
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+  .vip-title {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .vip-title {
+    font-size: 1.5rem;
+  }
+}
